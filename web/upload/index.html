@@ -1,60 +1,22 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kiosk Print - Upload</title>
-<style>
-  body { font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #111; }
-  h1 { font-size: 26px; margin-bottom: 8px; }
-  p { line-height: 1.4; }
-  input[type=file] { display: block; width: 100%; margin: 20px 0; font-size: 16px; }
-  button { width: 100%; font-size: 20px; font-weight: 600; padding: 14px; border-radius: 10px;
-           border: 2px solid #111; background: #111; color: #fff; }
-  button:disabled { opacity: .4; }
-  progress { width: 100%; height: 20px; margin-top: 16px; }
-  #msg { margin-top: 16px; font-weight: 600; }
-  .err { color: #b00020; }
-  .small { font-size: 14px; color: #555; }
-</style>
-</head>
-<body>
-<h1>Kiosk Print</h1>
-<p>Upload a PDF, Word or PowerPoint file. Then choose Colored or Black and white and pay at the machine.</p>
-<p id="busy" class="err" hidden>Tap "Print from phone" on the machine first.</p>
-<input id="file" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx">
-<button id="go" disabled>Upload</button>
-<progress id="bar" max="100" value="0" hidden></progress>
-<p id="msg"></p>
-<p class="small">Your file is deleted after printing.</p>
-<script>
-const $ = id => document.getElementById(id);
-$("file").onchange = () => { $("go").disabled = !$("file").files.length; };
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kiosk Print - Upload</title>
+    <<link rel="stylesheet" href="upload.css">
+  </head>
 
-fetch("/api/status").then(r => r.json()).then(s => { $("busy").hidden = s.accepting; }).catch(() => {});
-
-$("go").onclick = () => {
-  const f = $("file").files[0];
-  if (!f) return;
-  const form = new FormData();
-  form.append("file", f);
-  const xhr = new XMLHttpRequest();
-  xhr.open("POST", "/api/upload");
-  xhr.upload.onprogress = e => { if (e.lengthComputable) $("bar").value = 100 * e.loaded / e.total; };
-  xhr.onload = () => {
-    $("bar").hidden = true;
-    let d = {}; try { d = JSON.parse(xhr.responseText); } catch {}
-    if (xhr.status === 200) {
-      $("msg").className = ""; $("msg").textContent = "Uploaded! Go to the machine to choose Colored or Black and white and pay.";
-    } else {
-      $("msg").className = "err"; $("msg").textContent = d.detail || "Upload failed. Try again.";
-      $("go").disabled = false;
-    }
-  };
-  xhr.onerror = () => { $("bar").hidden = true; $("msg").className = "err"; $("msg").textContent = "Connection lost. Try again."; $("go").disabled = false; };
-  $("go").disabled = true; $("bar").hidden = false; $("bar").value = 0; $("msg").textContent = "Uploading...";
-  xhr.send(form);
-};
-</script>
-</body>
+  <body>
+    <h1>Kiosk Print</h1>
+    <p>Upload a PDF, Word or PowerPoint file. Then choose Colored or Black and white and pay at the machine.</p>
+    <p id="busy" class="err" hidden>Tap "Print from phone" on the machine first.</p>
+    <input id="file" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx">
+    <button id="go" disabled>Upload</button>
+    <progress id="bar" max="100" value="0" hidden></progress>
+    <p id="msg"></p>
+    <p class="small">Your file is deleted after printing.</p>
+    
+    <script src="upload.js"></script>
+  </body>
 </html>
