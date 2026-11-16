@@ -6,10 +6,8 @@ from pypdf import PdfReader
 
 OFFICE_EXT = {".doc", ".docx", ".ppt", ".pptx", ".odt", ".odp"}
 
-
 class DocError(Exception):
     pass
-
 
 def to_pdf(src: Path, timeout: int) -> Path:
     ext = src.suffix.lower()
@@ -20,8 +18,7 @@ def to_pdf(src: Path, timeout: int) -> Path:
     outdir = src.parent
     # Own profile dir so it never clashes with a LibreOffice you have open.
     profile = outdir.parent / "lo-profile"
-    cmd = ["soffice", f"-env:UserInstallation=file://{profile}", "--headless",
-           "--convert-to", "pdf", "--outdir", str(outdir), str(src)]
+    cmd = ["soffice", f"-env:UserInstallation=file://{profile}", "--headless", "--convert-to", "pdf", "--outdir", str(outdir), str(src)]
     try:
         subprocess.run(cmd, capture_output=True, timeout=timeout, check=True)
     except subprocess.TimeoutExpired:
