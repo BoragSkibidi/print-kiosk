@@ -1,0 +1,19 @@
+# sudo cp deploy/kiosk-print.service /etc/systemd/system/
+# sudo systemctl daemon-reload && sudo systemctl enable --now kiosk-print
+[Unit]
+Description=Kiosk Print backend
+After=network-online.target cups.service
+Wants=network-online.target
+
+[Service]
+User=kiosk
+WorkingDirectory=/home/kiosk/kiosk-print
+Environment=KIOSK_CONFIG=/home/kiosk/kiosk-print/deploy/config.pi.toml
+ExecStart=/home/kiosk/kiosk-print/.venv/bin/python -m app.main
+Restart=always
+RestartSec=2
+# allow port 80 without root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

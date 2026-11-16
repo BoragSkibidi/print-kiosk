@@ -1,4 +1,4 @@
-# Append to /home/piso/.bash_profile on the Pi.
+# Append to /home/kiosk/.bash_profile on the Pi.
 # Needs console autologin: sudo raspi-config nonint do_boot_behaviour B2
 # On tty1 it starts udiskie (automounts flash drives), waits for the backend,
 # then runs Chromium full screen inside cage. If Chromium crashes, cage exits,

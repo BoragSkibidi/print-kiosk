@@ -7,7 +7,7 @@ import threading
 import time
 from pathlib import Path
 
-log = logging.getLogger("piso.hw")
+log = logging.getLogger("kiosk-print.hw")
 
 
 class GpioCoinReader:

@@ -59,7 +59,7 @@ const cancelBtn = (label = "Cancel") => `<button data-act="cancel">${label}</but
 
 const SCREENS = {
   idle: s => `
-    <h1>Piso Print</h1>
+    <h1>Kiosk Print</h1>
     <div class="grid">
       <button data-act="phone">Print from phone</button>
       <button data-act="usb">Print from flash drive</button>

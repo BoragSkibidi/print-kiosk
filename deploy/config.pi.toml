@@ -1,4 +1,4 @@
-# Piso Print config for the Raspberry Pi (deployed machine).
+# Kiosk Print config for the Raspberry Pi (deployed machine).
 # Set cups_name to your printer (lpstat -p) and change the hotspot password.
 
 [price]
@@ -18,7 +18,7 @@ error_screen_s = 30
 convert_timeout_s = 180
 
 [paths]
-work_dir = "/tmp/piso-print"   # uploads + scans. MUST be RAM (tmpfs). Wiped on every start.
+work_dir = "/tmp/kiosk-print"   # uploads + scans. MUST be RAM (tmpfs). Wiped on every start.
 data_dir = "./var"             # persistent: state.json (paid amount) + ledger.log
 
 [server]
@@ -27,7 +27,7 @@ public_host = "0.0.0.0"          # upload page only; kiosk stays on 127.0.0.1
 public_port = 80
 
 [hotspot]
-ssid = "PisoPrint"
+ssid = "KioskPrint"
 password = "changeme123"
 upload_url = "http://10.42.0.1/"
 

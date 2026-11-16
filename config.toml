@@ -1,4 +1,4 @@
-# Piso Print config (development defaults for your Arch PC).
+# Kiosk Print config (development defaults for your Arch PC).
 # The Pi uses deploy/config.pi.toml. Prices can change here without touching code.
 
 [price]
@@ -18,7 +18,7 @@ error_screen_s = 30
 convert_timeout_s = 180
 
 [paths]
-work_dir = "/tmp/piso-print"   # uploads + scans. MUST be RAM (tmpfs). Wiped on every start.
+work_dir = "/tmp/kiosk-print"   # uploads + scans. MUST be RAM (tmpfs). Wiped on every start.
 data_dir = "./var"             # persistent: state.json (paid amount) + ledger.log
 
 [server]
@@ -27,7 +27,7 @@ public_host = "0.0.0.0"        # Pi: "10.42.0.1" (hotspot IP)
 public_port = 8000             # Pi: 80
 
 [hotspot]
-ssid = "PisoPrint"
+ssid = "KioskPrint"
 password = "changeme123"
 upload_url = "http://127.0.0.1:8000/"   # dev: use your PC's LAN IP to test from a phone
 
