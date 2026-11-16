@@ -1,0 +1,19 @@
+# sudo cp deploy/piso-print.service /etc/systemd/system/
+# sudo systemctl daemon-reload && sudo systemctl enable --now piso-print
+[Unit]
+Description=Piso Print backend
+After=network-online.target cups.service
+Wants=network-online.target
+
+[Service]
+User=piso
+WorkingDirectory=/home/piso/piso-print
+Environment=PISO_CONFIG=/home/piso/piso-print/deploy/config.pi.toml
+ExecStart=/home/piso/piso-print/.venv/bin/python -m app.main
+Restart=always
+RestartSec=2
+# allow port 80 without root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

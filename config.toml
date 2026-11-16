@@ -1,0 +1,61 @@
+# Piso Print config (development defaults for your Arch PC).
+# The Pi uses deploy/config.pi.toml. Prices can change here without touching code.
+
+[price]
+# pesos per block, pages per block. A job costs pesos * ceil(pages / pages_per_block).
+color = { pesos = 5, pages = 5 }
+bw    = { pesos = 5, pages = 10 }
+scan  = { pesos = 5, pages = 5 }   # PLACEHOLDER: scan-to-USB price not decided yet
+
+[limits]
+max_pages = 50
+max_upload_mb = 25
+allowed_ext = [".pdf", ".docx", ".doc", ".pptx", ".ppt"]
+phone_wait_s = 300       # QR screen goes back to start after this
+job_idle_s = 600         # unpaid job is deleted after this much inactivity
+done_screen_s = 8
+error_screen_s = 30
+convert_timeout_s = 180
+
+[paths]
+work_dir = "/tmp/piso-print"   # uploads + scans. MUST be RAM (tmpfs). Wiped on every start.
+data_dir = "./var"             # persistent: state.json (paid amount) + ledger.log
+
+[server]
+kiosk_port = 8001              # always bound to 127.0.0.1 (phones can't reach it)
+public_host = "0.0.0.0"        # Pi: "10.42.0.1" (hotspot IP)
+public_port = 8000             # Pi: 80
+
+[hotspot]
+ssid = "PisoPrint"
+password = "changeme123"
+upload_url = "http://127.0.0.1:8000/"   # dev: use your PC's LAN IP to test from a phone
+
+[hardware]
+coin = "mock"      # "mock" (keys 1/5/0 on kiosk) | "gpio"
+printer = "file"   # "file" (PDFs into ./out) | "cups"
+scanner = "mock"   # "mock" (fake pages) | "sane"
+
+[coin]
+gpio_pin = 17            # BCM numbering
+pesos_per_pulse = 1      # acceptor programmed so P1 = 1 pulse, P5 = 5, P10 = 10
+pulse_gap_ms = 400       # silence that ends one coin
+debounce_ms = 15         # ignore edges closer than this
+active_low = true        # optocoupler pulls the pin LOW on each pulse
+
+[printer]
+out_dir = "./out"                  # "file" printer writes here
+cups_name = "CUPS-PDF"             # see `lpstat -p`
+color_options = ["print-color-mode=color"]
+bw_options = ["print-color-mode=monochrome", "ColorModel=Gray"]
+extra_options = ["fit-to-page", "media=A4"]   # short bond = Letter, long bond = Legal
+job_timeout_s = 600
+
+[scanner]
+device = ""        # "" = default. List with `scanimage -L`
+resolution = 150
+mode = "Color"     # "" to omit
+
+[usb]
+mount_roots = ["/run/media", "/media"]   # Arch: /run/media/<user>, Pi OS: /media/<user>
+fake_drive = "./fake_usb"                # dev: this folder acts as a plugged-in drive ("" = off)

@@ -1,0 +1,13 @@
+# Append to /home/piso/.bash_profile on the Pi.
+# Needs console autologin: sudo raspi-config nonint do_boot_behaviour B2
+# On tty1 it starts udiskie (automounts flash drives), waits for the backend,
+# then runs Chromium full screen inside cage. If Chromium crashes, cage exits,
+# getty logs in again and this runs again.
+if [ -z "$WAYLAND_DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  pgrep -u "$USER" udiskie >/dev/null || udiskie --no-notify &
+  until curl -fs http://127.0.0.1:8001/api/state >/dev/null; do sleep 1; done
+  exec cage -- chromium --kiosk --incognito --noerrdialogs --disable-infobars \
+    --no-first-run --disable-pinch --overscroll-history-navigation=0 \
+    --disable-features=Translate --check-for-update-interval=31536000 \
+    http://127.0.0.1:8001/
+fi
