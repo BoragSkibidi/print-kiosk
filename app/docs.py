@@ -6,29 +6,36 @@ from pypdf import PdfReader
 
 OFFICE_EXT = {".doc", ".docx", ".ppt", ".pptx", ".odt", ".odp"}
 
-
 class DocError(Exception):
     pass
 
-
 def to_pdf(src: Path, timeout: int) -> Path:
     ext = src.suffix.lower()
+
     if ext == ".pdf":
         return src
     if ext not in OFFICE_EXT:
         raise DocError("Unsupported file type")
+    
     outdir = src.parent
+
     # Own profile dir so it never clashes with a LibreOffice you have open.
     profile = outdir.parent / "lo-profile"
-    cmd = ["soffice", f"-env:UserInstallation=file://{profile}", "--headless",
-           "--convert-to", "pdf", "--outdir", str(outdir), str(src)]
+
+    # PDF Conversion Command for OFFICE_EXT Filetype
+    cmd = ["soffice", f"-env:UserInstallation=file://{profile}", "--headless", "--convert-to", "pdf", "--outdir", str(outdir), str(src)]
+
     try:
         subprocess.run(cmd, capture_output=True, timeout=timeout, check=True)
     except subprocess.TimeoutExpired:
         raise DocError("File took too long to process")
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except subprocess.CalledProcessError:
         raise DocError("Could not convert this file")
+    except FileNotFoundError:
+        raise DocError("Could not find this file")
+        
     pdf = src.with_suffix(".pdf")
+
     if not pdf.exists():
         raise DocError("Could not convert this file")
     return pdf
@@ -49,7 +56,7 @@ def count_pages(pdf: Path) -> int:
     return n
 
 
-def images_to_pdf(images, out: Path, dpi: int) -> Path:
+def images_to_pdf(images: Path, out: Path, dpi: int) -> Path:
     from PIL import Image
     imgs = [Image.open(p).convert("RGB") for p in images]
     imgs[0].save(out, save_all=True, append_images=imgs[1:], resolution=float(dpi))
