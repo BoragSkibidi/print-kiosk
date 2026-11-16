@@ -55,12 +55,26 @@ def main():
     coin_reader = hw.start_coin_reader(cfg, machine.coin)  # noqa: F841 (keep a reference)
 
     s, web = cfg["server"], ROOT / "web"
+    
     servers = [
-        Server(uvicorn.Config(kiosk.create(machine, cfg, web), host="127.0.0.1",
-                              port=s["kiosk_port"], log_level="warning")),
-        Server(uvicorn.Config(upload.create(machine, cfg, web), host=s["public_host"],
-                              port=s["public_port"], log_level="warning")),
+        Server(
+            uvicorn.Config(
+                kiosk.create(machine, cfg, web), 
+                host="127.0.0.1",
+                port=s["kiosk_port"], 
+                log_level="warning"
+            )
+        ),
+        Server(
+            uvicorn.Config(
+                upload.create(machine, cfg, web), 
+                host=s["public_host"],
+                port=s["public_port"], 
+                log_level="warning"
+            )
+        ),
     ]
+
     log.info("kiosk  http://127.0.0.1:%d", s["kiosk_port"])
     log.info("upload http://%s:%d", s["public_host"], s["public_port"])
     log.info("hardware: %s", cfg["hardware"])

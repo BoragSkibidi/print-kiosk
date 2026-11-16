@@ -60,7 +60,7 @@ class Machine:
         threading.Thread(target=self._loop, daemon=True).start()
 
     # ---------- persistence ----------
-    def _load_paid(self):
+    def _load_paid(self) -> int:
         try:
             return int(json.loads(self.state_file.read_text())["paid"])
         except (OSError, ValueError, KeyError):
@@ -124,9 +124,11 @@ class Machine:
                 "prices": self.cfg["price"],
                 "usb_present": bool(usb.drives(self.cfg)),
                 "mock_coins": self.cfg["hardware"]["coin"] == "mock",
-                "hotspot": {"ssid": self.cfg["hotspot"]["ssid"],
-                            "password": self.cfg["hotspot"]["password"],
-                            "url": self.cfg["hotspot"]["upload_url"]},
+                "hotspot": {
+                    "ssid": self.cfg["hotspot"]["ssid"],
+                    "password": self.cfg["hotspot"]["password"],
+                    "url": self.cfg["hotspot"]["upload_url"]
+                },
             }
 
     # ---------- coins (called by the coin reader thread, never by a phone) ----------
