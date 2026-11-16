@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def load_config():
-    path = Path(os.environ.get("PISO_CONFIG", "config.toml"))
+    path = Path(os.environ.get("KIOSK_CONFIG", "config.toml"))
     with open(path, "rb") as f:
         cfg = tomllib.load(f)
     for kind, rule in cfg["price"].items():

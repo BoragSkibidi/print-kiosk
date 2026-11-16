@@ -20,7 +20,7 @@ from pathlib import Path
 from . import docs, usb
 from .pricing import price as calc_price
 
-log = logging.getLogger("piso.machine")
+log = logging.getLogger("kiosk-print.machine")
 
 
 class MachineError(Exception):

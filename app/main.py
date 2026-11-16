@@ -16,7 +16,7 @@ from .config import load_config
 from .machine import Machine
 
 ROOT = Path(__file__).resolve().parent.parent
-log = logging.getLogger("piso")
+log = logging.getLogger("kiosk-print")
 
 
 class Server(uvicorn.Server):

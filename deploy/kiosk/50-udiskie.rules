@@ -1,5 +1,5 @@
 // sudo cp deploy/kiosk/50-udiskie.rules /etc/polkit-1/rules.d/
-// Lets the "piso" user mount flash drives without a password prompt.
+// Lets the "kiosk" user mount flash drives without a password prompt.
 polkit.addRule(function (action, subject) {
   var allowed = [
     "org.freedesktop.udisks2.filesystem-mount",
@@ -7,7 +7,7 @@ polkit.addRule(function (action, subject) {
     "org.freedesktop.udisks2.eject-media",
     "org.freedesktop.udisks2.power-off-drive"
   ];
-  if (subject.user == "piso" && allowed.indexOf(action.id) >= 0) {
+  if (subject.user == "kiosk" && allowed.indexOf(action.id) >= 0) {
     return polkit.Result.YES;
   }
 });
