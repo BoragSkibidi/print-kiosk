@@ -6,10 +6,10 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .machine import MachineError
+from .machine import MachineError, Machine
 
 
-def create(machine, cfg, web: Path):
+def create(machine: Machine, cfg, web: Path):
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     L = cfg["limits"]
     max_bytes = L["max_upload_mb"] * 1024 * 1024
