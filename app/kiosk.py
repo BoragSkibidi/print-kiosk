@@ -7,7 +7,7 @@ from fastapi import Body, FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .machine import MachineError
+from .machine import MachineError, Machine
 
 
 def _wifi_escape(s: str) -> str:
@@ -22,7 +22,8 @@ def _qr_png(data) -> Response:
     return Response(buf.getvalue(), media_type="image/png")
 
 
-def create(machine, cfg, web: Path) -> None:
+# api for kiossk
+def create(machine: Machine, cfg, web: Path) -> None:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     m = machine
 
@@ -91,7 +92,8 @@ def create(machine, cfg, web: Path) -> None:
             value = int(body.get("value", 0))
             if value not in (1, 5, 10, 20):
                 raise HTTPException(400, "coin must be 1, 5, 10 or 20")
-            m.coin(value); return ok
+            m.coin(value); 
+            return ok
 
-    app.mount("/", StaticFiles(directory=web / "kiosk", html=True), name="kiosk")
+    app.mount("/", StaticFiles(directory= web / "kiosk", html=True), name="kiosk")
     return app
