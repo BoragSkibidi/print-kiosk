@@ -122,3 +122,11 @@ If `--mode=Color` errors, run `scanimage -A` to see your scanner's option names.
 - Scan-to-USB price is a placeholder (`[price] scan`).
 - CUPS "completed" means data sent, not paper out. Test on the real printer.
 - Captive portal skipped: customers scan two QR codes (Wi-Fi, then the URL).
+
+## Tools Used For Development
+
+- Arch Linux 	- by BoragSkibidi
+- Neovim 		- by BoragSkibidi
+___
+- Windows 11 - by nanashi
+- VSCode 		- by nanashi
