@@ -29,7 +29,7 @@ class Server(uvicorn.Server):
         yield
 
 
-async def serve(servers):
+async def serve(servers: Server):
     loop = asyncio.get_running_loop()
 
     def stop():
@@ -38,6 +38,7 @@ async def serve(servers):
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop)
+
     await asyncio.gather(*(s.serve() for s in servers))
 
 
@@ -55,7 +56,8 @@ def main():
     coin_reader = hw.start_coin_reader(cfg, machine.coin)  # noqa: F841 (keep a reference)
 
     s, web = cfg["server"], ROOT / "web"
-    
+
+    # Server Information for kiosk and public 
     servers = [
         Server(
             uvicorn.Config(
