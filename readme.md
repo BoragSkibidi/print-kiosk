@@ -1,4 +1,4 @@
-# piso-print
+# kiosk-print
 
 Coin-operated print / copy / scan kiosk for a Raspberry Pi 4.
 One customer at a time. Python + FastAPI backend, plain HTML kiosk UI.
@@ -73,30 +73,30 @@ If `--mode=Color` errors, run `scanimage -A` to see your scanner's option names.
              PC817 pin 3 (emitter)   -> Pi GND (pin 9)
   ```
   Do not join the two grounds. Check the pulse voltage with a multimeter first.
-- Watch it: `journalctl -u piso-print -f` prints `coin: N pulses -> PX`.
+- Watch it: `journalctl -u kiosk-print -f` prints `coin: N pulses -> PX`.
   If coins are miscounted, tune `pulse_gap_ms` / `debounce_ms`.
 
 ## Raspberry Pi setup
 
-1. Flash **Raspberry Pi OS Lite 64-bit** with Raspberry Pi Imager: user `piso`, SSH on, your Wi-Fi.
+1. Flash **Raspberry Pi OS Lite 64-bit** with Raspberry Pi Imager: user `kiosk`, SSH on, your Wi-Fi.
 2. Packages:
    ```sh
    sudo apt update && sudo apt install -y git python3-venv python3-gpiozero libreoffice-writer-nogui \
      libreoffice-impress-nogui fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation \
      cups sane-utils sane-airscan udiskie cage chromium curl
-   sudo usermod -aG lpadmin,scanner piso
+   sudo usermod -aG lpadmin,scanner kiosk
    ```
 3. Code:
    ```sh
-   git clone <your repo> ~/piso-print && cd ~/piso-print
+   git clone <your repo> ~/kiosk-print && cd ~/kiosk-print
    python3 -m venv --system-site-packages .venv
    .venv/bin/pip install -r requirements.txt
    ```
 4. RAM folder for uploads (add to `/etc/fstab`, then reboot):
    `tmpfs /tmp tmpfs defaults,noatime,nosuid,size=512m 0 0`
-5. Hotspot: `sudo raspi-config nonint do_wifi_country PH && sudo ./deploy/hotspot.sh PisoPrint 'yourpassword'`
+5. Hotspot: `sudo raspi-config nonint do_wifi_country PH && sudo ./deploy/hotspot.sh KioskPrint 'yourpassword'`
    (set up SSH over **Ethernet** first; the hotspot takes over wlan0). Put the same ssid/password in `deploy/config.pi.toml`.
-6. Backend service: `sudo cp deploy/piso-print.service /etc/systemd/system/ && sudo systemctl enable --now piso-print`
+6. Backend service: `sudo cp deploy/kiosk-print.service /etc/systemd/system/ && sudo systemctl enable --now kiosk-print`
 7. Kiosk: `sudo raspi-config nonint do_boot_behaviour B2`, `cat deploy/kiosk/bash_profile >> ~/.bash_profile`,
    `sudo cp deploy/kiosk/50-udiskie.rules /etc/polkit-1/rules.d/`, reboot.
 8. Screen: follow the seller's instructions for the DSI screen (`/boot/firmware/config.txt` overlay if needed).

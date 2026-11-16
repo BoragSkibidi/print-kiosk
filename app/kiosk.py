@@ -10,19 +10,19 @@ from fastapi.staticfiles import StaticFiles
 from .machine import MachineError
 
 
-def _wifi_escape(s):
+def _wifi_escape(s: str) -> str:
     for ch in '\\;,:"':
         s = s.replace(ch, "\\" + ch)
     return s
 
 
-def _qr_png(data):
+def _qr_png(data) -> Response:
     buf = io.BytesIO()
     qrcode.make(data, border=2).save(buf, format="PNG")
     return Response(buf.getvalue(), media_type="image/png")
 
 
-def create(machine, cfg, web: Path):
+def create(machine, cfg, web: Path) -> None:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     m = machine
 

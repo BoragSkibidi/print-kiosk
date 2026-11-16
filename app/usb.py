@@ -11,10 +11,12 @@ MAX_DEPTH = 3
 def drives(cfg):
     roots = [r.rstrip("/") + "/" for r in cfg["usb"]["mount_roots"]]
     found = []
+
     try:
         lines = Path("/proc/mounts").read_text().splitlines()
     except OSError:
         lines = []
+
     for line in lines:
         parts = line.split()
         if len(parts) < 2:
@@ -22,9 +24,11 @@ def drives(cfg):
         mp = parts[1].replace("\\040", " ")
         if any(mp.startswith(r) for r in roots):
             found.append(Path(mp))
+
     fake = cfg["usb"].get("fake_drive")
     if fake and Path(fake).is_dir():
         found.append(Path(fake).resolve())
+
     return found
 
 
@@ -37,6 +41,7 @@ def list_files(cfg):
             if len(rel.parts) >= MAX_DEPTH:
                 dirs[:] = []
             dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+
             for n in sorted(names):
                 p = Path(root) / n
                 if n.startswith(".") or p.suffix.lower() not in exts:
@@ -45,10 +50,17 @@ def list_files(cfg):
                     size = p.stat().st_size
                 except OSError:
                     continue
-                files.append({"path": str(p), "name": n,
-                              "folder": "" if str(rel) == "." else str(rel), "size": size})
+
+                files.append({
+                    "path": str(p), 
+                    "name": n,
+                    "folder": "" if str(rel) == "." else str(rel), 
+                    "size": size
+                })
+
                 if len(files) >= MAX_FILES:
                     return files
+                
     return files
 
 
