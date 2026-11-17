@@ -84,9 +84,9 @@ const SCREENS = {
     <h1>Kiosk Print</h1>
     <div class="grid">
       <button data-act="phone">Print from phone</button>
-      <button data-act="usb">Print from flash drive</button>
-      <button data-act="copy">Copy</button>
-      <button data-act="scanusb">Scan to flash drive</button>
+      <button data-act="usb">Print from USB drive</button>
+      <button data-act="copy">Photo Copy</button>
+      <button data-act="scanusb">Scan to USB drive</button>
     </div>
     <p class="small">${peso(s.prices.color.pesos)} = up to ${s.prices.color.pages} colored pages &nbsp;|&nbsp;
       ${peso(s.prices.bw.pesos)} = up to ${s.prices.bw.pages} black and white pages.
@@ -106,12 +106,31 @@ const SCREENS = {
 
   usb: s => {
     let body;
-    if (!s.usb_present) body = `<div class="center"><p class="big">Plug in your flash drive</p></div>`;
-    else if (usbFiles === null) body = `<div class="center"><p>Reading flash drive...</p></div>`;
-    else if (!usbFiles.length) body = `<div class="center"><p>No PDF, Word or PowerPoint files found.</p></div>`;
-    else body = `<div class="files">${usbFiles.map((f, i) => `
-        <button data-act="pick" data-arg="${i}">${esc(f.name)}
-        ${f.folder ? `<div class="folder">${esc(f.folder)}</div>` : ""}</button>`).join("")}</div>`;
+    if (!s.usb_present) body = `
+      <div class="center">
+        <p class="big">Plug in your flash drive</p>
+      </div>`;
+
+    else if (usbFiles === null) body = `
+      <div class="center">
+        <p>Reading flash drive...</p>
+      </div>`;
+
+    else if (!usbFiles.length) body = `
+      <div class="center">
+        <p>No PDF, Word or PowerPoint files found.</p>
+      </div>`;
+    
+    else body = `
+      <div class="files">${usbFiles.map((f, i) => `
+        <button data-act="pick" data-arg="${i}">
+          ${esc(f.name)}${f.folder ? `
+          
+          <div class="folder">
+            ${esc(f.folder)}
+          </div>` : ""}
+        </button>`).join("")}
+      </div>`;
     return `<h2>Pick a file</h2>${body}<div class="row">${cancelBtn()}</div>`;
   },
 
@@ -129,15 +148,32 @@ const SCREENS = {
     const ok = s.message && !s.message.startsWith("Scan failed");
     return pagesView(s, `
         <h2>${n} page(s) scanned</h2>
-        ${s.message ? `<p class="${ok ? "small" : "error"}">${esc(s.message)}</p>` : ""}
-        <p class="small">Showing page ${p + 1}. Tap a page on the left to check it.</p>
+        ${s.message ? `
+        
+        <p class="${ok ? "small" : "error"}">${esc(s.message)}</p>` : ""}
+        <p class="small">
+          Showing page ${p + 1}. Tap a page on the left to check it.
+        </p>
+
         <p>${price}</p>
+
         <div class="spacer"></div>
-        <button data-act="rescan">Rescan page ${p + 1} <span class="small">(free)</span></button>
+
+        <button data-act="rescan">
+          Rescan page ${p + 1} 
+          
+          <span class="small">
+            (free)
+          </span>
+        </button>
+
         <button data-act="more">Scan next page</button>
         <div class="row">
           ${cancelBtn()}
-          <button class="primary" data-act="scandone">Done</button>
+
+          <button class="primary" data-act="scandone">
+            Done
+          </button>
         </div>`);
   },
 
@@ -145,36 +181,136 @@ const SCREENS = {
     const j = s.job, isPrint = j.action === "print";
     const due = j.price === null ? null : Math.max(j.price - s.paid, 0);
     return pagesView(s, `
-    <h2 class="name">${esc(j.name)}</h2>
-    <p class="small">${j.pages} page(s)</p>
-    ${isPrint ? `<div class="row">
-      <button data-act="color" class="${j.mode === "color" ? "selected" : ""}">Colored</button>
-      <button data-act="bw" class="${j.mode === "bw" ? "selected" : ""}">Black and white</button>
-    </div>` : `<p>Scan saved to your flash drive after payment.</p>`}
-    <div class="row" style="align-items:baseline">
-      <p>Price: <span class="big">${j.price === null ? "--" : peso(j.price)}</span></p>
-      <p>Inserted: <span class="big">${peso(s.paid)}</span></p>
-    </div>
-    <p>${j.price === null ? "Choose Colored or Black and white." :
-         due > 0 ? `Insert <b>${peso(due)}</b> more.` : "Paid. Tap the button below."}
-       <span class="small">No change given.</span>
-       ${s.mock_coins ? `<span class="small">(dev: keys 1 / 5 / 0)</span>` : ""}</p>
-    <div class="spacer"></div>
-    <div class="row">
-      ${cancelBtn()}
-      <button class="primary" data-act="confirm" ${s.enough ? "" : "disabled"}>
-        ${isPrint ? "Print" : "Save to flash drive"}</button>
-    </div>`);
+      <h2 class="name">
+        ${esc(j.name)}
+      </h2>
+      
+      <p class="small">
+        ${j.pages} page(s)
+      </p>
+    
+      ${isPrint ? `
+      <div class="row">
+        <button data-act="color" class="${j.mode === "color" ? "selected" : ""}">
+          Colored
+        </button>
+      
+        <button data-act="bw" class="${j.mode === "bw" ? "selected" : ""}">
+          Black and white
+        </button>
+      </div>` : `
+      
+      <p>
+        Scan saved to your flash drive after payment.
+      </p>`}
+    
+      <div class="row" style="align-items:baseline">
+        <p>
+          Price: 
+          <span class="big">
+            ${j.price === null ? "--" : peso(j.price)}
+          </span>
+        </p>
+        <p>
+          Inserted: 
+          <span class="big">
+            ${peso(s.paid)}
+          </span></p>
+      </div>
+        
+      <p>
+        ${j.price === null ? "Choose Colored or Black and white." :due > 0 ? `Insert 
+      
+        <b>
+          ${peso(due)}
+        </b>
+        
+        more.` : "Paid. Tap the button below."}
+        
+        <span class="small">
+          No change given.
+        </span>    
+        ${s.mock_coins ? `
+
+        <span class="small">
+          (dev: keys 1 / 5 / 0)
+        </span>` : ""}
+        
+      </p>
+        
+      <div class="spacer"></div>
+      <div class="row">
+        ${cancelBtn()}
+        <button class="primary" data-act="confirm" ${s.enough ? "" : "disabled"}>
+          ${isPrint ? "Print" : "Save to flash drive"}
+        </button>
+      </div>`
+    );
   },
 
-  printing: () => `<div class="center"><p class="big">Printing...</p><p>Please wait for all pages.</p></div>`,
-  saving: () => `<div class="center"><p class="big">Saving...</p><p>Do not remove your flash drive.</p></div>`,
-  done: s => `<div class="center"><p class="big">${esc(s.message)}</p><p>Thank you!</p></div>
-    <div class="row">${cancelBtn("OK")}</div>`,
-  error: s => `<div class="center"><p class="big error">Sorry</p><p>${esc(s.message)}</p></div>
-    <div class="row">${cancelBtn("OK")}</div>`,
-  out_of_service: s => `<div class="center"><p class="big">Out of service</p><p>${esc(s.message)}</p>
-    <p class="small">Please come back later.</p></div>`,
+  printing: () => `
+    <div class="center">
+      <p class="big">
+          Printing...
+      </p>
+      <p>
+        Please wait for all pages.
+      </p>
+    </div>
+  `,
+
+  saving: () => `
+    <div class="center">
+      <p class="big">
+        Saving...
+      </p>
+      <p>
+        Do not remove your flash drive.
+      </p>
+    </div>
+  `,
+
+  done: s => `
+    <div class="center">
+      <p class="big">
+        ${esc(s.message)}
+      </p>
+      <p>
+        Thank you!
+      </p>
+    </div>
+    <div class="row">
+      ${cancelBtn("OK")}
+    </div>
+  `,
+
+  error: s => `
+    <div class="center">
+      <p class="big error">
+        Sorry
+      </p>
+      <p>
+        ${esc(s.message)}
+      </p>
+    </div>
+    <div class="row">
+      ${cancelBtn("OK")}
+    </div>
+  `,
+
+  out_of_service: s => `
+    <div class="center">
+      <p class="big">
+        Out of service
+      </p>
+      <p>
+        ${esc(s.message)}
+      </p>
+      <p class="small">
+        Please come back later.
+      </p>
+    </div>
+  `,
 };
 
 function draw(force) {
