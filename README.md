@@ -119,7 +119,7 @@ If `--mode=Color` errors, run `scanimage -A` to see your scanner's option names.
 
 ## TODO / open
 
-- Scan-to-USB price is a placeholder (`[price] scan`).
+- Scan to USB costs the same as B&W printing (override with `[price] scan`). Scanning and rescanning are free; the scan screen shows a preview of each page and the running price.
 - CUPS "completed" means data sent, not paper out. Test on the real printer.
 - Captive portal skipped: customers scan two QR codes (Wi-Fi, then the URL).
 
@@ -127,6 +127,5 @@ If `--mode=Color` errors, run `scanimage -A` to see your scanner's option names.
 
 - Arch Linux 	- by BoragSkibidi
 - Neovim 		- by BoragSkibidi
-___
-- Windows 11 - by nanashi
-- VSCode 		- by nanashi
+- Windows 11 - by NatsuShii
+- VSCode 		- by NatsuShii
