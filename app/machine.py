@@ -1,10 +1,11 @@
+
 """The machine: one customer at a time, so this is one state variable, not a job list.
-
+ 
 Scanning is free (rescan included); only printing / saving to USB costs.
-
+ 
 Screens: idle, phone_wait, usb, converting, scanning, scan_review, choose,
          printing, saving, done, error, out_of_service
-
+ 
 Money: `paid` = coins inserted for the current job. Saved to disk after every
 coin so a power cut doesn't lose it. Set to 0 when a job is paid for
 (leftover is forfeited: no change). Every coin and job goes to ledger.log.
@@ -18,17 +19,17 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-
+ 
 from . import docs, usb
 from .pricing import price as calc_price
-
+ 
 log = logging.getLogger("kiosk-print.machine")
-
-
+ 
+ 
 class MachineError(Exception):
     """Shown to the customer as-is."""
-
-
+ 
+ 
 class Machine:
     def __init__(self, cfg, printer, scanner):
         self.cfg = cfg
@@ -36,7 +37,8 @@ class Machine:
         self.printer = printer
         self.scanner = scanner
         self.lock = threading.RLock()
-
+        self.render_slots = threading.Semaphore(2)   # max PDF page renders at once (Pi CPU)
+ 
         self.work = Path(cfg["paths"]["work_dir"]).resolve()
         if len(self.work.parts) < 3 or self.work == Path.home():
             raise ValueError(f"work_dir {self.work} looks unsafe to wipe")
@@ -46,7 +48,7 @@ class Machine:
         self.data.mkdir(parents=True, exist_ok=True)
         self.state_file = self.data / "state.json"
         self.ledger_file = self.data / "ledger.log"
-
+ 
         self.paid = self._load_paid()
         self.screen = "idle"
         self.message = ""
@@ -58,17 +60,17 @@ class Machine:
         self.rescan_index = None   # page being replaced by a rescan (0-based)
         self.printer_ok, self.printer_msg = True, ""
         self._last_check = 0.0
-
+ 
         self.ledger("boot", paid=self.paid)
         threading.Thread(target=self._loop, daemon=True).start()
-
+ 
     # ---------- persistence ----------
     def _load_paid(self) -> int:
         try:
             return int(json.loads(self.state_file.read_text())["paid"])
         except (OSError, ValueError, KeyError):
             return 0
-
+ 
     def _save_paid(self):
         tmp = self.state_file.with_suffix(".tmp")
         with open(tmp, "w") as f:
@@ -76,33 +78,33 @@ class Machine:
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, self.state_file)
-
+ 
     def ledger(self, event, **kv):
         line = json.dumps({"t": datetime.now().isoformat(timespec="seconds"), "event": event, **kv})
         with open(self.ledger_file, "a") as f:
             f.write(line + "\n")
             f.flush()
             os.fsync(f.fileno())
-
+ 
     # ---------- helpers ----------
     def _set(self, screen, message=""):
         self.screen, self.message, self.since = screen, message, time.monotonic()
-
+ 
     def _touch(self):
         self.since = time.monotonic()
-
+ 
     def _require(self, *screens):
         if self.screen not in screens:
             raise MachineError("Not available right now")
-
+ 
     def _spawn(self, fn, *args):
         threading.Thread(target=fn, args=args, daemon=True).start()
-
+ 
     def new_job_dir(self):
         d = self.work / uuid.uuid4().hex[:8]
         d.mkdir()
         return d
-
+ 
     def _clear(self):
         if self.job:
             shutil.rmtree(self.job["dir"], ignore_errors=True)
@@ -111,7 +113,7 @@ class Machine:
             shutil.rmtree(self.scan_dir, ignore_errors=True)
             self.scan_dir = None
         self.scans, self.scan_action, self.rescan_index = [], None, None
-
+ 
     def _scan_quote(self):
         """What the scanned pages will cost, shown while scanning."""
         n = len(self.scans)
@@ -120,14 +122,32 @@ class Machine:
         if self.scan_action == "usb":
             return {"scan": calc_price(self.cfg["price"], "scan", n)}
         return {k: calc_price(self.cfg["price"], k, n) for k in ("color", "bw")}
-
-    def scan_preview(self, index):
-        """Path of a small JPEG preview of scanned page `index` (0-based)."""
+ 
+    def scan_preview(self, index, full=False):
+        """Scanned page `index` (0-based): small JPEG, or the full-size PNG for zooming."""
         with self.lock:
             if self.screen not in ("scan_review", "scanning") or not 0 <= index < len(self.scans):
                 raise MachineError("No such page")
-            return self.scans[index].with_suffix(".jpg")
-
+            png = self.scans[index]
+            return png if full else png.with_suffix(".jpg")
+ 
+    def job_preview(self, index, full=False):
+        """Page `index` (0-based) of the loaded job's PDF as a JPEG, rendered on first request."""
+        with self.lock:
+            j = self.job
+            if self.screen != "choose" or not j or not 0 <= index < j["pages"]:
+                raise MachineError("No such page")
+            pdf, out = j["pdf"], j["dir"] / "preview" / f"{'full' if full else 'thumb'}{index + 1:03}.jpg"
+        if out.exists():
+            return out
+        with self.render_slots:                   # outside the lock: rendering takes a while
+            if not out.exists():
+                try:
+                    docs.render_page(pdf, index, out, 1600 if full else 600)
+                except docs.DocError as e:
+                    raise MachineError(str(e))
+        return out
+ 
     def snapshot(self):
         with self.lock:
             j = self.job
@@ -136,7 +156,8 @@ class Machine:
                 "screen": self.screen,
                 "message": self.message,
                 "paid": self.paid,
-                "job": None if not j else {k: j[k] for k in ("name", "pages", "mode", "price", "action")},
+                "job": None if not j else {**{k: j[k] for k in ("name", "pages", "mode", "price", "action")},
+                                           "id": j["dir"].name},          # new id per job -> fresh previews
                 "enough": price is not None and self.paid >= price,
                 "scans": len(self.scans),
                 "scan_pages": [p.stem for p in self.scans],   # changes on rescan -> new preview
@@ -152,7 +173,7 @@ class Machine:
                     "url": self.cfg["hotspot"]["upload_url"]
                 },
             }
-
+ 
     # ---------- coins (called by the coin reader thread, never by a phone) ----------
     def coin(self, value):
         with self.lock:
@@ -161,16 +182,16 @@ class Machine:
             self._touch()
             self.ledger("coin", value=value, paid=self.paid)
         log.info("coin +%d, paid=%d", value, self.paid)
-
+ 
     # ---------- print from phone ----------
     def phone_start(self):
         with self.lock:
             self._require("idle")
             self._set("phone_wait")
-
+ 
     def accepting_upload(self):
         return self.screen == "phone_wait"
-
+ 
     def upload_received(self, path: Path, name: str):
         with self.lock:
             if self.screen != "phone_wait":
@@ -178,16 +199,16 @@ class Machine:
                 raise MachineError("Machine busy")
             self._set("converting")
         self._spawn(self._prepare, path, name)
-
+ 
     # ---------- print from USB ----------
     def usb_open(self):
         with self.lock:
             self._require("idle")
             self._set("usb")
-
+ 
     def usb_files(self):
         return usb.list_files(self.cfg)
-
+ 
     def usb_select(self, path):
         with self.lock:
             self._require("usb")
@@ -200,7 +221,7 @@ class Machine:
             dest = self.new_job_dir() / ("input" + src.suffix.lower())
             self._set("converting")
         self._spawn(self._copy_then_prepare, src, dest)
-
+ 
     def _copy_then_prepare(self, src, dest):
         try:
             shutil.copyfile(src, dest)
@@ -211,7 +232,7 @@ class Machine:
                     self._set("error", "Could not read the file from the flash drive")
             return
         self._prepare(dest, src.name)
-
+ 
     def _prepare(self, path: Path, name: str):
         try:
             pdf = docs.to_pdf(path, self.L["convert_timeout_s"])
@@ -233,7 +254,7 @@ class Machine:
             self.job = {"dir": path.parent, "pdf": pdf, "name": name, "pages": pages,
                         "mode": None, "price": None, "action": "print"}
             self._set("choose")
-
+ 
     # ---------- copy / scan to USB ----------
     def scan_start(self, action):
         if action not in ("copy", "usb"):
@@ -246,7 +267,7 @@ class Machine:
             self.scan_dir = self.new_job_dir()
             self._set("scanning")
         self._spawn(self._scan_one)
-
+ 
     def scan_more(self):
         with self.lock:
             self._require("scan_review")
@@ -254,7 +275,7 @@ class Machine:
                 raise MachineError(f"Limit is {self.L['max_pages']} pages")
             self._set("scanning")
         self._spawn(self._scan_one)
-
+ 
     def scan_rescan(self, index):
         """Scan page `index` (0-based) again and replace it. Free: only printing/saving costs."""
         with self.lock:
@@ -264,7 +285,7 @@ class Machine:
             self.rescan_index = index
             self._set("scanning")
         self._spawn(self._scan_one)
-
+ 
     def _scan_one(self):
         with self.lock:
             scan_dir = self.scan_dir
@@ -296,7 +317,7 @@ class Machine:
                 old.unlink(missing_ok=True)
                 old.with_suffix(".jpg").unlink(missing_ok=True)
                 self._set("scan_review", f"Page {i + 1} scanned again.")
-
+ 
     @staticmethod
     def _make_preview(png: Path):
         from PIL import Image
@@ -304,7 +325,7 @@ class Machine:
             img = img.convert("RGB")
             img.thumbnail((600, 600))
             img.save(png.with_suffix(".jpg"), quality=80)
-
+ 
     def scan_done(self):
         with self.lock:
             self._require("scan_review")
@@ -320,7 +341,7 @@ class Machine:
                 self.job["price"] = calc_price(self.cfg["price"], "scan", n)
             self.scan_dir, self.scans, self.scan_action = None, [], None
             self._set("choose")
-
+ 
     # ---------- choose, pay, run ----------
     def set_mode(self, mode):
         if mode not in ("color", "bw"):
@@ -332,7 +353,7 @@ class Machine:
             self.job["mode"] = mode
             self.job["price"] = calc_price(self.cfg["price"], mode, self.job["pages"])
             self._touch()
-
+ 
     def confirm(self):
         with self.lock:
             self._require("choose")
@@ -352,7 +373,7 @@ class Machine:
             self._save_paid()
             self._set("printing" if j["action"] == "print" else "saving")
         self._spawn(self._run, j)
-
+ 
     def _run(self, j):
         try:
             if j["action"] == "print":
@@ -374,7 +395,7 @@ class Machine:
             with self.lock:
                 if self.job is j:
                     self.job = None
-
+ 
     def cancel(self):
         with self.lock:
             if self.screen in ("printing", "saving"):
@@ -383,7 +404,7 @@ class Machine:
                 return
             self._clear()
             self._set("idle")
-
+ 
     # ---------- background: timeouts + printer health ----------
     def _loop(self):
         while True:
@@ -392,7 +413,7 @@ class Machine:
                 self._tick()
             except Exception:
                 log.exception("tick failed")
-
+ 
     def _tick(self):
         now = time.monotonic()
         if now - self._last_check > 10 and self.screen in ("idle", "out_of_service"):
