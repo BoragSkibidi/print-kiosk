@@ -30,7 +30,16 @@ fake_usb/                acts as a plugged-in flash drive in dev
 ## Run on Arch (dev)
 
 ```sh
-sudo pacman -S --needed python libreoffice-fresh
+sudo pacman -S --needed python libreoffice-fresh poppler
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m pytest -q          # 21 tests
+.venv/bin/python -m app.main
+```
+
+## Run on Pi OS Lite (debug)
+```sh
+sudo apt update && sudo apt install -y --no-install-recommends python3 python3-pip python3-venv libreoffice poppler-utils
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q          # 21 tests

@@ -21,7 +21,6 @@ def _qr_png(data) -> Response:
     qrcode.make(data, border=2).save(buf, format="PNG")
     return Response(buf.getvalue(), media_type="image/png")
 
-
 # api for kiossk
 def create(machine: Machine, cfg, web: Path) -> None:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -30,7 +29,6 @@ def create(machine: Machine, cfg, web: Path) -> None:
     @app.exception_handler(MachineError)
     async def machine_error(_, e):
         return JSONResponse({"detail": str(e)}, status_code=400)
-
     ok = {"ok": True}
 
     @app.get("/api/state")
@@ -65,12 +63,19 @@ def create(machine: Machine, cfg, web: Path) -> None:
     def scan_rescan(body: dict = Body(...)):
         m.scan_rescan(body.get("index")); return ok
 
+    cache = {"Cache-Control": "private, max-age=600"}
+
     @app.get("/api/scan/preview/{index}")
-    def scan_preview(index: int):
-        path = m.scan_preview(index)
+    def scan_preview(index: int, full: int = 0):
+        path = m.scan_preview(index, bool(full))
         if not path.exists():
             raise HTTPException(404)
-        return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+        return FileResponse(path, media_type="image/png" if full else "image/jpeg", headers=cache)
+
+    @app.get("/api/job/preview/{index}")
+    def job_preview(index: int, full: int = 0):
+        path = m.job_preview(index, bool(full))
+        return FileResponse(path, media_type="image/jpeg", headers=cache)
 
     @app.post("/api/scan/done")
     def scan_done():

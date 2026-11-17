@@ -1,5 +1,6 @@
 """End-to-end flows with mock hardware (no printer, scanner or coin acceptor needed)."""
 import json
+import shutil
 import time
 
 import pytest
@@ -208,3 +209,43 @@ def test_preview_endpoint(machine):
     assert c.post("/api/scan/rescan", json={"index": 0}).status_code == 200
     wait_for(m, "scan_review")
     assert c.post("/api/scan/rescan", json={"index": "x"}).status_code == 400
+
+def test_full_size_scan_for_zoom(machine):
+    m = machine
+    m.scan_start("copy")
+    wait_for(m, "scan_review")
+    assert m.scan_preview(0, full=True).suffix == ".png"
+    assert m.scan_preview(0).suffix == ".jpg"
+
+
+@pytest.mark.skipif(not shutil.which("pdftoppm"), reason="needs poppler (pdftoppm)")
+def test_job_preview_renders_pages(machine):
+    from PIL import Image
+    m = machine
+    upload(m, 3)
+    thumb = m.job_preview(2)
+    full = m.job_preview(2, full=True)
+    assert thumb.exists() and full.exists() and thumb != full
+    assert max(Image.open(thumb).size) == 600 and max(Image.open(full).size) == 1600
+    assert m.job_preview(2) == thumb                     # cached, not rendered again
+    with pytest.raises(MachineError):
+        m.job_preview(3)                                 # only 3 pages
+    job_dir = m.job["dir"]
+    m.cancel()
+    assert not job_dir.exists()                          # previews deleted with the job
+    with pytest.raises(MachineError):
+        m.job_preview(0)
+
+
+@pytest.mark.skipif(not shutil.which("pdftoppm"), reason="needs poppler (pdftoppm)")
+def test_job_preview_endpoint(machine):
+    from fastapi.testclient import TestClient
+    from pathlib import Path
+    from app import kiosk
+    m = machine
+    c = TestClient(kiosk.create(m, m.cfg, Path("web")))
+    assert c.get("/api/job/preview/0").status_code == 400     # no job loaded
+    upload(m, 2)
+    assert m.snapshot()["job"]["id"] == m.job["dir"].name
+    r = c.get("/api/job/preview/1?full=1")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
