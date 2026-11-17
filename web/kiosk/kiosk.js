@@ -6,6 +6,8 @@ let S = null;          // last state from the server
 let drawn = "";        // what is on screen, to avoid redrawing every poll
 let usbFiles = null;   // file list while on the "usb" screen
 let usbPresent = null;
+let selPage = 0;       // scanned page shown in the preview (0-based)
+let seenScans = 0;     // page count last drawn, to jump to a newly scanned page
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const peso = n => "₱" + n;
@@ -39,6 +41,8 @@ const ACT = {
   scanusb: () => post("/api/scan/start", {action: "usb"}),
   more: () => post("/api/scan/more"),
   scandone: () => post("/api/scan/done"),
+  view: i => { selPage = Number(i); draw(true); },
+  rescan: () => post("/api/scan/rescan", {index: selPage}),
   color: () => post("/api/mode", {mode: "color"}),
   bw: () => post("/api/mode", {mode: "bw"}),
   confirm: () => post("/api/confirm"),
@@ -68,7 +72,8 @@ const SCREENS = {
     </div>
     <p class="small">${peso(s.prices.color.pesos)} = up to ${s.prices.color.pages} colored pages &nbsp;|&nbsp;
       ${peso(s.prices.bw.pesos)} = up to ${s.prices.bw.pages} black and white pages.
-      No change given. Files are deleted after printing.</p>`,
+      Scan to flash drive: ${peso((s.prices.scan || s.prices.bw).pesos)} = up to ${(s.prices.scan || s.prices.bw).pages} pages.
+      Scanning is free, pay only to print or save. No change given. Files are deleted after printing.</p>`,
 
   phone_wait: s => `
     <h2>Print from your phone</h2>
@@ -95,18 +100,36 @@ const SCREENS = {
   converting: () => `<div class="center"><p class="big">Processing your file...</p><p>Please wait.</p></div>
     <div class="row">${cancelBtn()}</div>`,
 
-  scanning: () => `<div class="center"><p class="big">Scanning...</p><p>Keep the lid closed.</p></div>`,
+  scanning: s => `<div class="center"><p class="big">${s.rescan_index === null
+      ? "Scanning..." : `Scanning page ${s.rescan_index + 1} again...`}</p><p>Keep the lid closed.</p></div>`,
 
-  scan_review: s => `
-    <h2>${s.scans} page(s) scanned</h2>
-    ${s.message ? `<p class="error">${esc(s.message)}</p>` : ""}
-    <p>Place the next page face down and tap <b>Scan next page</b>, or tap <b>Done</b>.</p>
-    <div class="spacer"></div>
-    <div class="row">
-      ${cancelBtn()}
-      <button data-act="more">Scan next page</button>
-      <button class="primary" data-act="scandone">Done</button>
-    </div>`,
+  scan_review: s => {
+    const n = s.scans, p = selPage, q = s.scan_quote;
+    const price = !q ? "" : s.scan_action === "usb"
+      ? `Save to flash drive: <b>${peso(q.scan)}</b>`
+      : `Colored <b>${peso(q.color)}</b> &nbsp;|&nbsp; B&amp;W <b>${peso(q.bw)}</b>`;
+    const ok = s.message && !s.message.startsWith("Scan failed");
+    return `
+    <div class="scanview">
+      <div class="thumbs">${s.scan_pages.map((stem, i) => `
+        <button data-act="view" data-arg="${i}" class="${i === p ? "selected" : ""}">
+          <img src="/api/scan/preview/${i}?v=${stem}" alt=""><span>${i + 1}</span></button>`).join("")}</div>
+      <div class="preview"><img src="/api/scan/preview/${p}?v=${s.scan_pages[p]}" alt="Page ${p + 1}"></div>
+      <div class="side">
+        <h2>${n} page(s) scanned</h2>
+        ${s.message ? `<p class="${ok ? "small" : "error"}">${esc(s.message)}</p>` : ""}
+        <p class="small">Showing page ${p + 1}. Tap a page on the left to check it.</p>
+        <p>${price}</p>
+        <div class="spacer"></div>
+        <button data-act="rescan">Rescan page ${p + 1} <span class="small">(free)</span></button>
+        <button data-act="more">Scan next page</button>
+        <div class="row">
+          ${cancelBtn()}
+          <button class="primary" data-act="scandone">Done</button>
+        </div>
+      </div>
+    </div>`;
+  },
 
   choose: s => {
     const j = s.job, isPrint = j.action === "print";
@@ -151,7 +174,12 @@ function draw(force) {
     if (S.usb_present) { loadUsb(); return; }
   }
   if (S.screen !== "usb") usbPresent = null;
-  const key = JSON.stringify(S) + (S.screen === "usb" ? JSON.stringify(usbFiles) : "");
+  if (S.screen === "scan_review") {
+    if (S.scans !== seenScans) selPage = S.scans - 1;     // new page -> show it
+    selPage = Math.min(Math.max(selPage, 0), S.scans - 1);
+    seenScans = S.scans;
+  } else if (S.screen !== "scanning") { seenScans = 0; selPage = 0; }
+  const key = JSON.stringify(S) + (S.screen === "usb" ? JSON.stringify(usbFiles) : "") + "|" + selPage;
   if (!force && key === drawn) return;
   drawn = key;
   $paid.textContent = S.paid > 0 && S.screen !== "choose" ? "Inserted " + peso(S.paid) : "";

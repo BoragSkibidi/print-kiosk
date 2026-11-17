@@ -5,7 +5,8 @@
 # pesos per block, pages per block. A job costs pesos * ceil(pages / pages_per_block).
 color = { pesos = 5, pages = 5 }
 bw    = { pesos = 5, pages = 10 }
-scan  = { pesos = 5, pages = 5 }   # PLACEHOLDER: scan-to-USB price not decided yet
+# Scan to USB costs the same as bw. Add  scan = { pesos = .., pages = .. }  to override.
+# Scanning and rescanning are free; you only pay to print or save.
 
 [limits]
 max_pages = 50

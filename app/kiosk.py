@@ -4,7 +4,7 @@ from pathlib import Path
 
 import qrcode
 from fastapi import Body, FastAPI, HTTPException
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .machine import MachineError, Machine
@@ -60,6 +60,17 @@ def create(machine: Machine, cfg, web: Path) -> None:
     @app.post("/api/scan/more")
     def scan_more():
         m.scan_more(); return ok
+
+    @app.post("/api/scan/rescan")
+    def scan_rescan(body: dict = Body(...)):
+        m.scan_rescan(body.get("index")); return ok
+
+    @app.get("/api/scan/preview/{index}")
+    def scan_preview(index: int):
+        path = m.scan_preview(index)
+        if not path.exists():
+            raise HTTPException(404)
+        return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
     @app.post("/api/scan/done")
     def scan_done():

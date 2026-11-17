@@ -1,5 +1,7 @@
 """The machine: one customer at a time, so this is one state variable, not a job list.
 
+Scanning is free (rescan included); only printing / saving to USB costs.
+
 Screens: idle, phone_wait, usb, converting, scanning, scan_review, choose,
          printing, saving, done, error, out_of_service
 
@@ -53,6 +55,7 @@ class Machine:
         self.scans = []            # scanned page images (copy / scan to USB)
         self.scan_dir = None
         self.scan_action = None    # "copy" | "usb"
+        self.rescan_index = None   # page being replaced by a rescan (0-based)
         self.printer_ok, self.printer_msg = True, ""
         self._last_check = 0.0
 
@@ -107,7 +110,23 @@ class Machine:
         if self.scan_dir:
             shutil.rmtree(self.scan_dir, ignore_errors=True)
             self.scan_dir = None
-        self.scans, self.scan_action = [], None
+        self.scans, self.scan_action, self.rescan_index = [], None, None
+
+    def _scan_quote(self):
+        """What the scanned pages will cost, shown while scanning."""
+        n = len(self.scans)
+        if not n:
+            return None
+        if self.scan_action == "usb":
+            return {"scan": calc_price(self.cfg["price"], "scan", n)}
+        return {k: calc_price(self.cfg["price"], k, n) for k in ("color", "bw")}
+
+    def scan_preview(self, index):
+        """Path of a small JPEG preview of scanned page `index` (0-based)."""
+        with self.lock:
+            if self.screen not in ("scan_review", "scanning") or not 0 <= index < len(self.scans):
+                raise MachineError("No such page")
+            return self.scans[index].with_suffix(".jpg")
 
     def snapshot(self):
         with self.lock:
@@ -120,6 +139,9 @@ class Machine:
                 "job": None if not j else {k: j[k] for k in ("name", "pages", "mode", "price", "action")},
                 "enough": price is not None and self.paid >= price,
                 "scans": len(self.scans),
+                "scan_pages": [p.stem for p in self.scans],   # changes on rescan -> new preview
+                "scan_quote": self._scan_quote(),
+                "rescan_index": self.rescan_index,
                 "scan_action": self.scan_action,
                 "prices": self.cfg["price"],
                 "usb_present": bool(usb.drives(self.cfg)),
@@ -220,7 +242,7 @@ class Machine:
             self._require("idle")
             if action == "usb" and not usb.drives(self.cfg):
                 raise MachineError("Plug in a flash drive first")
-            self.scan_action, self.scans = action, []
+            self.scan_action, self.scans, self.rescan_index = action, [], None
             self.scan_dir = self.new_job_dir()
             self._set("scanning")
         self._spawn(self._scan_one)
@@ -233,14 +255,28 @@ class Machine:
             self._set("scanning")
         self._spawn(self._scan_one)
 
+    def scan_rescan(self, index):
+        """Scan page `index` (0-based) again and replace it. Free: only printing/saving costs."""
+        with self.lock:
+            self._require("scan_review")
+            if not isinstance(index, int) or not 0 <= index < len(self.scans):
+                raise MachineError("No such page")
+            self.rescan_index = index
+            self._set("scanning")
+        self._spawn(self._scan_one)
+
     def _scan_one(self):
         with self.lock:
-            out = self.scan_dir / f"page{len(self.scans) + 1:03}.png"
+            scan_dir = self.scan_dir
+            out = scan_dir / f"page_{uuid.uuid4().hex[:8]}.png"   # new name so previews refresh
         try:
             self.scanner.scan(out)
+            self._make_preview(out)
         except Exception:
             log.exception("scan failed")
+            out.unlink(missing_ok=True)
             with self.lock:
+                self.rescan_index = None
                 if self.screen == "scanning":
                     if self.scans:
                         self._set("scan_review", "Scan failed. Try again.")
@@ -249,10 +285,25 @@ class Machine:
                         self._set("error", "Scanner error. Please try again later.")
             return
         with self.lock:
-            if self.screen != "scanning":         # cancelled
+            if self.screen != "scanning" or self.scan_dir is not scan_dir:   # cancelled
                 return
-            self.scans.append(out)
-            self._set("scan_review")
+            i, self.rescan_index = self.rescan_index, None
+            if i is None:
+                self.scans.append(out)
+                self._set("scan_review")
+            else:
+                old, self.scans[i] = self.scans[i], out
+                old.unlink(missing_ok=True)
+                old.with_suffix(".jpg").unlink(missing_ok=True)
+                self._set("scan_review", f"Page {i + 1} scanned again.")
+
+    @staticmethod
+    def _make_preview(png: Path):
+        from PIL import Image
+        with Image.open(png) as img:
+            img = img.convert("RGB")
+            img.thumbnail((600, 600))
+            img.save(png.with_suffix(".jpg"), quality=80)
 
     def scan_done(self):
         with self.lock:

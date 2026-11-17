@@ -21,3 +21,9 @@ def test_price(kind, pages, expected):
 def test_price_follows_config():
     table = {**TABLE, "color": {"pesos": 10, "pages": 4}}
     assert price(table, "color", 5) == 20
+
+
+def test_scan_follows_bw_when_not_set():
+    table = {k: v for k, v in TABLE.items() if k != "scan"}
+    for pages in (1, 10, 11, 25):
+        assert price(table, "scan", pages) == price(table, "bw", pages)

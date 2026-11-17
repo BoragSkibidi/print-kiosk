@@ -5,5 +5,4 @@ pypdf>=4.0
 pillow>=10.0
 qrcode>=7.4
 pytest>=8.0
-# On the Pi only: gpiozero comes from the system (python3-gpiozero),
-# so create the venv with --system-site-packages there.
+httpx>=0.27

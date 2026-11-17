@@ -154,3 +154,57 @@ def test_scan_to_usb(machine):
     m.confirm()
     wait_for(m, "done")
     assert len(list((m.tmp / "usb").glob("scan_*.pdf"))) == 1
+
+
+def test_scan_to_usb_costs_bw_price(machine):
+    m = machine
+    m.cfg["price"].pop("scan", None)
+    m.scan_start("usb")
+    wait_for(m, "scan_review")
+    for _ in range(10):
+        m.scan_more()
+        wait_for(m, "scan_review")
+    assert m.snapshot()["scan_quote"] == {"scan": 10}     # 11 pages, bw = P5 per 10
+    m.scan_done()
+    assert m.job["price"] == 10
+
+
+def test_rescan_replaces_page_for_free(machine):
+    m = machine
+    m.scan_start("copy")
+    wait_for(m, "scan_review")
+    m.scan_more()
+    wait_for(m, "scan_review")
+    first, second = list(m.scans)
+    assert m.scan_preview(0).exists()
+    m.coin(5)
+    m.scan_rescan(0)
+    assert m.snapshot()["rescan_index"] == 0
+    wait_for(m, "scan_review")
+    assert len(m.scans) == 2 and m.scans[1] == second and m.scans[0] != first
+    assert not first.exists() and not first.with_suffix(".jpg").exists()
+    assert m.scan_preview(0).exists()
+    assert m.paid == 5                                   # rescanning charged nothing
+    assert m.snapshot()["scan_quote"] == {"color": 5, "bw": 5}
+    with pytest.raises(MachineError):
+        m.scan_rescan(5)
+    with pytest.raises(MachineError):
+        m.scan_preview(5)
+    m.scan_done()
+    assert m.job["pages"] == 2
+
+
+def test_preview_endpoint(machine):
+    from fastapi.testclient import TestClient
+    from pathlib import Path
+    from app import kiosk
+    m = machine
+    c = TestClient(kiosk.create(m, m.cfg, Path("web")))
+    assert c.get("/api/scan/preview/0").status_code == 400
+    c.post("/api/scan/start", json={"action": "copy"})
+    wait_for(m, "scan_review")
+    r = c.get("/api/scan/preview/0")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+    assert c.post("/api/scan/rescan", json={"index": 0}).status_code == 200
+    wait_for(m, "scan_review")
+    assert c.post("/api/scan/rescan", json={"index": "x"}).status_code == 400
