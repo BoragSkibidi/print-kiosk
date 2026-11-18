@@ -30,7 +30,16 @@ fake_usb/                acts as a plugged-in flash drive in dev
 ## Run on Arch (dev)
 
 ```sh
-sudo pacman -S --needed python libreoffice-fresh
+sudo pacman -S --needed python libreoffice-fresh poppler
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m pytest -q          # 21 tests
+.venv/bin/python -m app.main
+```
+
+## Run on Pi OS Lite (debug)
+```sh
+sudo apt update && sudo apt install -y --no-install-recommends python3 python3-pip python3-venv libreoffice poppler-utils
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q          # 21 tests
@@ -119,6 +128,13 @@ If `--mode=Color` errors, run `scanimage -A` to see your scanner's option names.
 
 ## TODO / open
 
-- Scan-to-USB price is a placeholder (`[price] scan`).
+- Scan to USB costs the same as B&W printing (override with `[price] scan`). Scanning and rescanning are free; the scan screen shows a preview of each page and the running price.
 - CUPS "completed" means data sent, not paper out. Test on the real printer.
 - Captive portal skipped: customers scan two QR codes (Wi-Fi, then the URL).
+
+## Tools Used For Development
+
+- Arch Linux 	- by BoragSkibidi
+- Neovim 		- by BoragSkibidi
+- Windows 11 - by NatsuShii
+- VSCode 		- by NatsuShii
