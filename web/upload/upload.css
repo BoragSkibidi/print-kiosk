@@ -1,3 +1,4 @@
+
 body {
   font-family: system-ui, sans-serif;
   max-width: 480px;
@@ -21,7 +22,7 @@ input[type=file] {
   margin: 20px 0;
   font-size: 16px; 
 }
-
+ 
 button { 
   width: 100%; 
   font-size: 20px; 
@@ -40,7 +41,7 @@ progress {
   height: 20px;
   margin-top: 16px;
 }
-
+ 
   #msg { 
     margin-top: 16px; 
     font-weight: 600;
@@ -55,3 +56,21 @@ progress {
     font-size: 14px;
     color: #555;
   }
+ 
+.box {
+  border: 2px solid #111;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  background: #fff8d6;
+}
+ 
+.box ol {
+  margin: 10px 0 10px 20px;
+  line-height: 1.6;
+}
+ 
+.ok {
+  color: #11782f;
+}
+ 

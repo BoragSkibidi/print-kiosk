@@ -85,6 +85,10 @@ def create(machine: Machine, cfg, web: Path) -> None:
     def mode(body: dict = Body(...)):
         m.set_mode(body.get("mode")); return ok
 
+    @app.post("/api/copies")
+    def copies(body: dict = Body(...)):
+        m.set_copies(body.get("copies")); return ok
+
     @app.post("/api/confirm")
     def confirm():
         m.confirm(); return ok
@@ -93,14 +97,15 @@ def create(machine: Machine, cfg, web: Path) -> None:
     def cancel():
         m.cancel(); return ok
 
-    @app.get("/api/qr/{kind}")
-    def qr(kind: str):
-        h = cfg["hotspot"]
-        if kind == "wifi":
-            return _qr_png(f"WIFI:T:WPA;S:{_wifi_escape(h['ssid'])};P:{_wifi_escape(h['password'])};;")
-        if kind == "url":
-            return _qr_png(h["upload_url"])
-        raise HTTPException(404)
+    @app.get("/api/qr/wifi")
+    def qr_wifi():
+        # Made fresh for the current phone session: new SSID + password every time.
+        ses = m.session
+        if not ses:
+            raise HTTPException(404)
+        png = _qr_png(f"WIFI:T:WPA;S:{_wifi_escape(ses.ssid)};P:{_wifi_escape(ses.password)};;")
+        png.headers["Cache-Control"] = "no-store"
+        return png
 
     if cfg["hardware"]["coin"] == "mock":
         @app.post("/api/dev/coin")

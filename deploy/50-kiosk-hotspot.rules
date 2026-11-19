@@ -1,0 +1,14 @@
+// Installed by deploy/hotspot.sh into /etc/polkit-1/rules.d/
+// Lets the kiosk service user turn the hotspot on/off and change its SSID/password
+// (nmcli con modify / up / down) without running the app as root.
+polkit.addRule(function (action, subject) {
+  if (subject.user == "kiosk" &&
+      (action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||
+       action.id == "org.freedesktop.NetworkManager.network-control" ||
+       action.id == "org.freedesktop.NetworkManager.enable-disable-wifi" ||
+       action.id == "org.freedesktop.NetworkManager.wifi.share.protected" ||
+       action.id == "org.freedesktop.NetworkManager.wifi.share.open")) {
+    return polkit.Result.YES;
+  }
+});
+`

@@ -20,11 +20,12 @@ class FilePrinter:
             return False, "Printer offline (mock)"
         return True, ""
 
-    def print(self, pdf, mode, pages):
-        time.sleep(min(1 + pages * 0.3, 6))
+    def print(self, pdf, mode, pages, copies=1):
+        time.sleep(min(1 + pages * copies * 0.3, 6))
         if (self.out / "JAM").exists():
             raise RuntimeError("Paper jam (mock)")
-        dest = self.out / f"{datetime.now():%Y%m%d_%H%M%S}_{mode}_{pages}p.pdf"
+        extra = f"_x{copies}" if copies > 1 else ""
+        dest = self.out / f"{datetime.now():%Y%m%d_%H%M%S}_{mode}_{pages}p{extra}.pdf"
         shutil.copyfile(pdf, dest)
 
 
@@ -33,9 +34,12 @@ class MockScanner:
         self.dpi = c.get("resolution", 150)
         self.n = 0
 
-    def scan(self, out: Path):
+    def scan(self, out: Path, on_progress=None):
         from PIL import Image, ImageDraw
-        time.sleep(1.5)
+        for pct in range(0, 101, 10):          # like scanimage --progress
+            if on_progress:
+                on_progress(pct)
+            time.sleep(0.15)
         self.n += 1
         w, h = int(8.27 * self.dpi), int(11.69 * self.dpi)   # A4
         img = Image.new("RGB", (w, h), "white")

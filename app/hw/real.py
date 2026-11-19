@@ -76,10 +76,12 @@ class CupsPrinter:
             return False, "Printer stopped"
         return True, ""
 
-    def print(self, pdf: Path, mode, pages):
+    def print(self, pdf: Path, mode, pages, copies=1):
         opts = list(self.c["extra_options"])
         opts += self.c["color_options"] if mode == "color" else self.c["bw_options"]
-        cmd = ["lp", "-d", self.name]
+        cmd = ["lp", "-d", self.name, "-n", str(copies)]
+        if copies > 1:
+            opts.append("collate=true")       # 1,2,3,1,2,3 instead of 1,1,2,2,3,3
         for o in opts:
             cmd += ["-o", o]
         r = _run(cmd + [str(pdf)])
@@ -87,7 +89,7 @@ class CupsPrinter:
         if r.returncode != 0 or not m:
             raise RuntimeError("Printer refused the job")
         job = m.group(1)
-        log.info("CUPS job %s (%s, %d pages)", job, mode, pages)
+        log.info("CUPS job %s (%s, %d pages x %d)", job, mode, pages, copies)
 
         # NOTE: CUPS "completed" means data was sent, not that paper came out.
         # Good enough for the prototype; check pages-completed via IPP later if needed.
@@ -112,13 +114,30 @@ class SaneScanner:
         self.c = c
         self.dpi = c["resolution"]
 
-    def scan(self, out: Path):
-        cmd = ["scanimage", "--format=png", f"--resolution={self.dpi}", "-o", str(out)]
+    def scan(self, out: Path, on_progress=None):
+        cmd = ["scanimage", "--format=png", f"--resolution={self.dpi}", "--progress", "-o", str(out)]
         if self.c.get("device"):
             cmd[1:1] = ["-d", self.c["device"]]
         if self.c.get("mode"):
             cmd.append(f"--mode={self.c['mode']}")
-        r = _run(cmd, timeout=180)
-        if r.returncode != 0 or not out.exists():
-            raise RuntimeError("Scanner error: " + r.stderr.strip()[-200:])
+        # --progress writes "Progress: 42.1%" to stderr, separated by \r
+        p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        killer = threading.Timer(180, p.kill)     # a stuck scanner must not hang the kiosk
+        killer.start()
+        tail, buf = b"", b""
+        try:
+            while chunk := p.stderr.read1(256):
+                buf += chunk
+                *parts, buf = re.split(rb"[\r\n]", buf)
+                for part in parts:
+                    m = re.match(rb"Progress: ([\d.]+)%", part)
+                    if m and on_progress:
+                        on_progress(float(m.group(1)))
+                    elif part.strip():
+                        tail = (tail + b" " + part.strip())[-200:]
+            p.wait()
+        finally:
+            killer.cancel()
+        if p.returncode != 0 or not out.exists():
+            raise RuntimeError("Scanner error: " + (tail + buf).decode(errors="replace").strip())
         return out

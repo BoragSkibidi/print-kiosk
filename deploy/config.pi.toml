@@ -1,6 +1,7 @@
 
+ 
 # Kiosk Print config for the Raspberry Pi (deployed machine).
-# Set cups_name to your printer (lpstat -p) and change the hotspot password.
+# Set cups_name to your printer (lpstat -p). Hotspot name/password are random per session.
  
 [price]
 # pesos per block, pages per block. A job costs pesos * ceil(pages / pages_per_block).
@@ -25,18 +26,21 @@ data_dir = "./var"             # persistent: state.json (paid amount) + ledger.l
  
 [server]
 kiosk_port = 8001              # always bound to 127.0.0.1 (phones can't reach it)
-public_host = "0.0.0.0"          # upload page only; kiosk stays on 127.0.0.1
-public_port = 80
+public_host = "10.42.0.1"      # phone servers bind to the hotspot IP only
+captive_port = 80              # captive portal: phones probe port 80 after joining Wi-Fi
+upload_port_range = [20000, 60000]   # upload page gets a random port every session
  
 [hotspot]
-ssid = "KioskPrint"
-password = "changeme123"
-upload_url = "http://10.42.0.1/"
+# A new SSID (<prefix>-XXXX) and password are made for every phone session.
+ssid_prefix = "KioskPrint"
+host = "10.42.0.1"
+connection = "kiosk-hotspot"   # made once by deploy/hotspot.sh
  
 [hardware]
 coin = "gpio"
 printer = "cups"
 scanner = "sane"
+hotspot = "nmcli"
  
 [coin]
 gpio_pin = 17            # BCM numbering
