@@ -331,3 +331,114 @@ button.preview {
   z-index: 20;
 }
  
+
+/* ---------- page strip: its own scroll area, pages never squish ---------- */
+.strip {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.thumbs {
+  overflow: visible;
+}
+.thumbs button {
+  flex: none;                   /* many pages: scroll, don't shrink */
+}
+.thumbs .page {
+  aspect-ratio: 210 / 297;      /* A4 box, even before the image loads */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  overflow: hidden;
+}
+.thumbs .page img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;          /* landscape pages fit inside, never stretched */
+  aspect-ratio: auto;
+}
+.preview.empty {
+  border-style: dashed;
+  text-align: center;
+  padding: 20px;
+  color: #555;
+  font-size: 17px;
+}
+
+/* ---------- loading / busy ---------- */
+.spinner {
+  width: 54px;
+  height: 54px;
+  border: 6px solid #ddd;
+  border-top-color: #111;
+  border-radius: 50%;
+  animation: spin .9s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.bar {
+  width: 420px;
+  height: 18px;
+  border: 2px solid #111;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #eee;
+}
+.bar > div {
+  height: 100%;
+  background: #111;
+  transition: width .4s ease;
+}
+.bar.busy > div {               /* no real progress known: a block that keeps moving */
+  width: 35%;
+  animation: busy 1.4s ease-in-out infinite;
+}
+@keyframes busy {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+
+/* ---------- phone screen ---------- */
+.phone {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+}
+.phone .qrcode {
+  width: 250px;
+  height: 250px;
+  image-rendering: pixelated;
+  flex: none;
+}
+.phone .steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ok {
+  color: #11782f;
+}
+
+/* ---------- copies counter ---------- */
+.copies {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.copies span {
+  flex: 1;
+}
+.copies button {
+  width: 56px;
+  min-height: 48px;
+  padding: 0;
+  font-size: 26px;
+  line-height: 1;
+}
+.copies b {
+  min-width: 36px;
+  text-align: center;
+  font-size: 24px;
+}

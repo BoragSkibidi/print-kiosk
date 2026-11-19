@@ -24,18 +24,21 @@ data_dir = "./var"             # persistent: state.json (paid amount) + ledger.l
 
 [server]
 kiosk_port = 8001              # always bound to 127.0.0.1 (phones can't reach it)
-public_host = "0.0.0.0"        # Pi: "10.42.0.1" (hotspot IP)
-public_port = 8000             # Pi: 80
+public_host = "0.0.0.0"        # phone servers bind here (Pi: "10.42.0.1", the hotspot IP)
+captive_port = 8000            # captive portal (Pi: 80, phones probe port 80)
+upload_port_range = [20000, 60000]   # upload page gets a random port every session
 
 [hotspot]
-ssid = "KioskPrint"
-password = "changeme123"
-upload_url = "http://127.0.0.1:8000/"   # dev: use your PC's LAN IP to test from a phone
+# A new SSID (<prefix>-XXXX) and password are made for every phone session.
+ssid_prefix = "KioskPrint"
+host = "127.0.0.1"             # address phones use. Dev: your PC's LAN IP to test from a real phone
+connection = "kiosk-hotspot"   # NetworkManager connection (deploy/hotspot.sh), used when hotspot = "nmcli"
 
 [hardware]
 coin = "mock"      # "mock" (keys 1/5/0 on kiosk) | "gpio"
 printer = "file"   # "file" (PDFs into ./out) | "cups"
 scanner = "mock"   # "mock" (fake pages) | "sane"
+hotspot = "mock"   # "mock" (no Wi-Fi changes) | "nmcli"
 
 [coin]
 gpio_pin = 17            # BCM numbering

@@ -45,6 +45,7 @@ const ACT = {
   view: i => { selPage = Number(i); draw(true); },
   zoom: () => openViewer(),
   rescan: () => post("/api/scan/rescan", {index: selPage}),
+  copies: d => post("/api/copies", {copies: S.job.copies + Number(d)}),
   color: () => post("/api/mode", {mode: "color"}),
   bw: () => post("/api/mode", {mode: "bw"}),
   confirm: () => post("/api/confirm"),
@@ -68,68 +69,123 @@ const pageCount = s => s.screen === "choose" ? s.job.pages : s.scans;
 const pageSrc = (s, i, full) => (s.screen === "choose"
   ? `/api/job/preview/${i}?v=${s.job.id}` : `/api/scan/preview/${i}?v=${s.scan_pages[i]}`) + (full ? "&full=1" : "");
 
-// page strip | big preview (tap = fullscreen) | side panel
-const pagesView = (s, side) => `
+// Loading / busy screen: spinner, title, optional line, optional progress bar.
+// pct = number -> real progress (scanner), pct = "busy" -> moving bar (no real progress known).
+const loader = (title, sub = "", pct = null) => `
+  <div class="center">
+    <div class="spinner"></div>
+    <p class="big">${title}</p>
+    ${sub ? `<p>${sub}</p>` : ""}
+    ${pct === null ? "" : bar(pct)}
+  </div>`;
+const bar = pct => pct === "busy"
+  ? `<div class="bar busy"><div></div></div>`
+  : `<div class="bar"><div style="width:${pct}%"></div></div><p class="small">${pct}%</p>`;
+
+// page strip (own scroll area) | big preview (tap = fullscreen) | side panel
+const pagesView = (s, side, empty = "") => {
+  const n = pageCount(s);
+  return `
   <div class="scanview">
-    <div class="thumbs">${Array.from({length: pageCount(s)}, (_, i) => `
+    <div class="strip"><div class="thumbs">${Array.from({length: n}, (_, i) => `
       <button data-act="view" data-arg="${i}" class="${i === selPage ? "selected" : ""}">
-        <img src="${pageSrc(s, i)}" loading="lazy" alt=""><span>${i + 1}</span></button>`).join("")}</div>
-    <button class="preview" data-act="zoom"><img src="${pageSrc(s, selPage)}" alt="Page ${selPage + 1}">
-      <span class="hint">Tap to enlarge</span></button>
+        <div class="page"><img src="${pageSrc(s, i)}" loading="lazy" alt=""></div><span>${i + 1}</span></button>`).join("")}
+    </div></div>
+    ${n ? `<button class="preview" data-act="zoom"><img src="${pageSrc(s, selPage)}" alt="Page ${selPage + 1}">
+      <span class="hint">Tap to enlarge</span></button>`
+        : `<div class="preview empty"><p>${empty}</p></div>`}
     <div class="side">${side}</div>
   </div>`;
+};
 
 const SCREENS = {
   idle: s => `
     <h1>Kiosk Print</h1>
     <div class="grid">
       <button data-act="phone">Print from phone</button>
-      <button data-act="usb">Print from flash drive</button>
-      <button data-act="copy">Copy</button>
-      <button data-act="scanusb">Scan to flash drive</button>
+      <button data-act="usb">Print from USB drive</button>
+      <button data-act="copy">Photo Copy</button>
+      <button data-act="scanusb">Scan to USB drive</button>
     </div>
     <p class="small">${peso(s.prices.color.pesos)} = up to ${s.prices.color.pages} colored pages &nbsp;|&nbsp;
       ${peso(s.prices.bw.pesos)} = up to ${s.prices.bw.pages} black and white pages.
       Scan to flash drive: ${peso((s.prices.scan || s.prices.bw).pesos)} = up to ${(s.prices.scan || s.prices.bw).pages} pages.
       Scanning is free, pay only to print or save. No change given. Files are deleted after printing.</p>`,
 
-  phone_wait: s => `
+  phone_wait: s => {
+    const ph = s.phone;
+    if (!ph || ph.state === "starting") return loader("Starting Wi-Fi...", "Getting a private hotspot ready for your phone.", "busy")
+      + `<div class="row">${cancelBtn()}</div>`;
+    return `
     <h2>Print from your phone</h2>
-    <div class="qr">
-      <div><img src="/api/qr/wifi" alt=""><p><b>1. Join Wi-Fi</b></p>
-        <p class="small">${esc(s.hotspot.ssid)} / ${esc(s.hotspot.password)}</p></div>
-      <div><img src="/api/qr/url" alt=""><p><b>2. Open and upload</b></p>
-        <p class="small">${esc(s.hotspot.url)}</p></div>
+    <div class="phone">
+      <img class="qrcode" src="/api/qr/wifi?v=${encodeURIComponent(ph.ssid)}" alt="">
+      <div class="steps">
+        ${ph.connected ? `<p class="ok big">Phone connected</p>
+          <p>Pick your file on your phone and tap <b>Upload</b>.</p>` : `
+        <p><b>1.</b> Scan with your phone camera to join the Wi-Fi.</p>
+        <p><b>2.</b> The upload page opens by itself.</p>`}
+        <p class="small">Wi-Fi: <b>${esc(ph.ssid)}</b> &nbsp; Password: <b>${esc(ph.password)}</b><br>
+          Page didn't open? Go to <b>${esc(ph.url.replace(/^http:\/\//, "").replace(/\/$/, ""))}</b> in your browser.<br>
+          New Wi-Fi and password every time. One phone at a time.</p>
+      </div>
     </div>
     <div class="spacer"></div>
-    <div class="row">${cancelBtn()}</div>`,
+    <div class="row">${cancelBtn()}</div>`;
+  },
 
   usb: s => {
     let body;
-    if (!s.usb_present) body = `<div class="center"><p class="big">Plug in your flash drive</p></div>`;
-    else if (usbFiles === null) body = `<div class="center"><p>Reading flash drive...</p></div>`;
-    else if (!usbFiles.length) body = `<div class="center"><p>No PDF, Word or PowerPoint files found.</p></div>`;
-    else body = `<div class="files">${usbFiles.map((f, i) => `
-        <button data-act="pick" data-arg="${i}">${esc(f.name)}
-        ${f.folder ? `<div class="folder">${esc(f.folder)}</div>` : ""}</button>`).join("")}</div>`;
+    if (!s.usb_present) body = `
+      <div class="center">
+        <p class="big">Plug in your flash drive</p>
+      </div>`;
+
+    else if (usbFiles === null) body = loader("Reading flash drive...");
+
+    else if (!usbFiles.length) body = `
+      <div class="center">
+        <p>No PDF, Word or PowerPoint files found.</p>
+      </div>`;
+    
+    else body = `
+      <div class="files">${usbFiles.map((f, i) => `
+        <button data-act="pick" data-arg="${i}">
+          ${esc(f.name)}${f.folder ? `
+          
+          <div class="folder">
+            ${esc(f.folder)}
+          </div>` : ""}
+        </button>`).join("")}
+      </div>`;
     return `<h2>Pick a file</h2>${body}<div class="row">${cancelBtn()}</div>`;
   },
 
-  converting: () => `<div class="center"><p class="big">Processing your file...</p><p>Please wait.</p></div>
-    <div class="row">${cancelBtn()}</div>`,
+  converting: () => loader("Processing your file...", "Please wait.", "busy") + `<div class="row">${cancelBtn()}</div>`,
 
-  scanning: s => `<div class="center"><p class="big">${s.rescan_index === null
-      ? "Scanning..." : `Scanning page ${s.rescan_index + 1} again...`}</p><p>Keep the lid closed.</p></div>`,
+  scanning: s => loader(s.rescan_index === null ? "Scanning..." : `Scanning page ${s.rescan_index + 1} again...`,
+    "Keep the lid closed.", s.progress === null ? "busy" : s.progress),
 
   scan_review: s => {
-    const n = s.scans, p = selPage, q = s.scan_quote;
-    const price = !q ? "" : s.scan_action === "usb"
+    const n = s.scans, p = selPage, q = s.scan_quote, usbScan = s.scan_action === "usb";
+    const price = !q ? "" : usbScan
       ? `Save to flash drive: <b>${peso(q.scan)}</b>`
       : `Colored <b>${peso(q.color)}</b> &nbsp;|&nbsp; B&amp;W <b>${peso(q.bw)}</b>`;
     const ok = s.message && !s.message.startsWith("Scan failed");
+    const msg = s.message ? `<p class="${ok ? "small" : "error"}">${esc(s.message)}</p>` : "";
+    const title = usbScan ? "Scan to flash drive" : "Photocopy";
+    if (!n) return pagesView(s, `
+        <h2>${title}</h2>
+        ${msg}
+        <p>Put your page <b>face down</b> on the glass and close the lid.</p>
+        <p class="small">Scanning is free. You pay only to ${usbScan ? "save" : "print"}.</p>
+        <div class="spacer"></div>
+        <button class="primary" data-act="more">Scan</button>
+        <div class="row">${cancelBtn()}<button data-act="scandone" disabled>Done</button></div>`,
+      "Your scanned pages will show here.");
     return pagesView(s, `
         <h2>${n} page(s) scanned</h2>
-        ${s.message ? `<p class="${ok ? "small" : "error"}">${esc(s.message)}</p>` : ""}
+        ${msg}
         <p class="small">Showing page ${p + 1}. Tap a page on the left to check it.</p>
         <p>${price}</p>
         <div class="spacer"></div>
@@ -144,37 +200,83 @@ const SCREENS = {
   choose: s => {
     const j = s.job, isPrint = j.action === "print";
     const due = j.price === null ? null : Math.max(j.price - s.paid, 0);
+    const total = j.pages * j.copies;
     return pagesView(s, `
-    <h2 class="name">${esc(j.name)}</h2>
-    <p class="small">${j.pages} page(s)</p>
-    ${isPrint ? `<div class="row">
-      <button data-act="color" class="${j.mode === "color" ? "selected" : ""}">Colored</button>
-      <button data-act="bw" class="${j.mode === "bw" ? "selected" : ""}">Black and white</button>
-    </div>` : `<p>Scan saved to your flash drive after payment.</p>`}
-    <div class="row" style="align-items:baseline">
-      <p>Price: <span class="big">${j.price === null ? "--" : peso(j.price)}</span></p>
-      <p>Inserted: <span class="big">${peso(s.paid)}</span></p>
-    </div>
-    <p>${j.price === null ? "Choose Colored or Black and white." :
-         due > 0 ? `Insert <b>${peso(due)}</b> more.` : "Paid. Tap the button below."}
-       <span class="small">No change given.</span>
-       ${s.mock_coins ? `<span class="small">(dev: keys 1 / 5 / 0)</span>` : ""}</p>
-    <div class="spacer"></div>
-    <div class="row">
-      ${cancelBtn()}
-      <button class="primary" data-act="confirm" ${s.enough ? "" : "disabled"}>
-        ${isPrint ? "Print" : "Save to flash drive"}</button>
-    </div>`);
+      <h2 class="name">${esc(j.name)}</h2>
+      <p class="small">${j.pages} page(s)${j.copies > 1 ? ` &times; ${j.copies} copies = ${total} pages` : ""}</p>
+      ${isPrint ? `
+      <div class="row">
+        <button data-act="color" class="${j.mode === "color" ? "selected" : ""}">Colored</button>
+        <button data-act="bw" class="${j.mode === "bw" ? "selected" : ""}">Black and white</button>
+      </div>
+      <div class="copies">
+        <span>Copies</span>
+        <button data-act="copies" data-arg="-1" ${j.copies <= 1 ? "disabled" : ""}>&minus;</button>
+        <b>${j.copies}</b>
+        <button data-act="copies" data-arg="1" ${j.copies >= j.max_copies ? "disabled" : ""}>+</button>
+      </div>` : `<p>Scan saved to your flash drive after payment.</p>`}
+      <div class="row" style="align-items:baseline">
+        <p>Price: <span class="big">${j.price === null ? "--" : peso(j.price)}</span></p>
+        <p>Inserted: <span class="big">${peso(s.paid)}</span></p>
+      </div>
+      <p>${j.price === null ? "Choose Colored or Black and white." :
+           due > 0 ? `Insert <b>${peso(due)}</b> more.` : "Paid. Tap the button below."}
+         <span class="small">No change given.</span>
+         ${s.mock_coins ? `<span class="small">(dev: keys 1 / 5 / 0)</span>` : ""}</p>
+      <div class="spacer"></div>
+      <div class="row">
+        ${cancelBtn()}
+        <button class="primary" data-act="confirm" ${s.enough ? "" : "disabled"}>
+          ${isPrint ? "Print" : "Save to flash drive"}</button>
+      </div>`);
   },
 
-  printing: () => `<div class="center"><p class="big">Printing...</p><p>Please wait for all pages.</p></div>`,
-  saving: () => `<div class="center"><p class="big">Saving...</p><p>Do not remove your flash drive.</p></div>`,
-  done: s => `<div class="center"><p class="big">${esc(s.message)}</p><p>Thank you!</p></div>
-    <div class="row">${cancelBtn("OK")}</div>`,
-  error: s => `<div class="center"><p class="big error">Sorry</p><p>${esc(s.message)}</p></div>
-    <div class="row">${cancelBtn("OK")}</div>`,
-  out_of_service: s => `<div class="center"><p class="big">Out of service</p><p>${esc(s.message)}</p>
-    <p class="small">Please come back later.</p></div>`,
+  printing: s => loader("Printing...",
+    s.job && s.job.copies > 1 ? `${s.job.copies} copies. Please wait for all pages.` : "Please wait for all pages.", "busy"),
+
+  saving: () => loader("Saving...", "Do not remove your flash drive.", "busy"),
+
+  done: s => `
+    <div class="center">
+      <p class="big">
+        ${esc(s.message)}
+      </p>
+      <p>
+        Thank you!
+      </p>
+    </div>
+    <div class="row">
+      ${cancelBtn("OK")}
+    </div>
+  `,
+
+  error: s => `
+    <div class="center">
+      <p class="big error">
+        Sorry
+      </p>
+      <p>
+        ${esc(s.message)}
+      </p>
+    </div>
+    <div class="row">
+      ${cancelBtn("OK")}
+    </div>
+  `,
+
+  out_of_service: s => `
+    <div class="center">
+      <p class="big">
+        Out of service
+      </p>
+      <p>
+        ${esc(s.message)}
+      </p>
+      <p class="small">
+        Please come back later.
+      </p>
+    </div>
+  `,
 };
 
 function draw(force) {
@@ -187,7 +289,7 @@ function draw(force) {
   if (S.screen !== "usb") usbPresent = null;
   if (S.screen === "scan_review") {
     if (S.scans !== seenScans) selPage = S.scans - 1;     // new page -> show it
-    selPage = Math.min(Math.max(selPage, 0), S.scans - 1);
+    selPage = Math.max(Math.min(selPage, S.scans - 1), 0);
     seenScans = S.scans;
   } else if (S.screen === "choose") {
     if (S.job.id !== seenJob) { seenJob = S.job.id; selPage = 0; }   // new job -> page 1
@@ -197,9 +299,9 @@ function draw(force) {
   if (!force && key === drawn) return;
   drawn = key;
   $paid.textContent = S.paid > 0 && S.screen !== "choose" ? "Inserted " + peso(S.paid) : "";
-  const strip = $app.querySelector(".thumbs"), top = strip ? strip.scrollTop : 0;
+  const strip = $app.querySelector(".strip"), top = strip ? strip.scrollTop : 0;
   $app.innerHTML = (SCREENS[S.screen] || (() => `<p>${esc(S.screen)}</p>`))(S);
-  const strip2 = $app.querySelector(".thumbs");              // keep the strip where it was
+  const strip2 = $app.querySelector(".strip");               // keep the strip where it was
   if (strip2) { strip2.scrollTop = top; strip2.querySelector(".selected")?.scrollIntoView({block: "nearest"}); }
 }
 
@@ -295,7 +397,18 @@ $vstage.addEventListener("wheel", e => {           // dev: mouse wheel zoom on t
 }, {passive: false});
 
 async function poll() {
-  try { S = await (await fetch("/api/state")).json(); draw(); }
-  catch { $app.innerHTML = `<div class="center"><p class="big">Starting...</p></div>`; drawn = ""; }
+  try {
+    const r = await fetch("/api/state");
+    if (!r.ok) throw new Error(r.status);
+    S = await r.json();
+    draw();
+  } catch {
+    // never had state: the backend is still starting. Had state: we lost it (restart / crash).
+    $app.innerHTML = S ? loader("Reconnecting...", "The machine will be back in a moment.")
+                       : loader("Starting...", "Getting the machine ready.");
+    $paid.textContent = "";
+    if (V) { V = null; $viewer.hidden = true; }
+    drawn = "";
+  }
 }
 (async function loop() { await poll(); setTimeout(loop, 500); })();
