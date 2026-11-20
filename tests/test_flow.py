@@ -133,6 +133,8 @@ def test_usb_rejects_outside_path(machine):
 def test_copy_flow(machine):
     m = machine
     m.scan_start("copy")
+    assert m.screen == "scan_review" and m.scans == []   # opens on the preview
+    m.scan_more()                                            # "Scan"
     wait_for(m, "scan_review")
     m.scan_more()
     wait_for(m, "scan_review")
@@ -148,6 +150,8 @@ def test_copy_flow(machine):
 def test_scan_to_usb(machine):
     m = machine
     m.scan_start("usb")
+    assert m.screen == "scan_review" and m.scans == []   # opens on the preview
+    m.scan_more()                                            # "Scan"
     wait_for(m, "scan_review")
     m.scan_done()
     assert m.job["price"] == 5
@@ -161,6 +165,8 @@ def test_scan_to_usb_costs_bw_price(machine):
     m = machine
     m.cfg["price"].pop("scan", None)
     m.scan_start("usb")
+    assert m.screen == "scan_review" and m.scans == []   # opens on the preview
+    m.scan_more()                                            # "Scan"
     wait_for(m, "scan_review")
     for _ in range(10):
         m.scan_more()
@@ -173,6 +179,8 @@ def test_scan_to_usb_costs_bw_price(machine):
 def test_rescan_replaces_page_for_free(machine):
     m = machine
     m.scan_start("copy")
+    assert m.screen == "scan_review" and m.scans == []   # opens on the preview
+    m.scan_more()                                            # "Scan"
     wait_for(m, "scan_review")
     m.scan_more()
     wait_for(m, "scan_review")
@@ -203,6 +211,7 @@ def test_preview_endpoint(machine):
     c = TestClient(kiosk.create(m, m.cfg, Path("web")))
     assert c.get("/api/scan/preview/0").status_code == 400
     c.post("/api/scan/start", json={"action": "copy"})
+    c.post("/api/scan/more")
     wait_for(m, "scan_review")
     r = c.get("/api/scan/preview/0")
     assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
@@ -213,6 +222,8 @@ def test_preview_endpoint(machine):
 def test_full_size_scan_for_zoom(machine):
     m = machine
     m.scan_start("copy")
+    assert m.screen == "scan_review" and m.scans == []   # opens on the preview
+    m.scan_more()                                            # "Scan"
     wait_for(m, "scan_review")
     assert m.scan_preview(0, full=True).suffix == ".png"
     assert m.scan_preview(0).suffix == ".jpg"
@@ -249,3 +260,162 @@ def test_job_preview_endpoint(machine):
     assert m.snapshot()["job"]["id"] == m.job["dir"].name
     r = c.get("/api/job/preview/1?full=1")
     assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+
+
+# ---------- new: scan opens on the preview ----------
+
+def test_scan_opens_on_empty_preview(machine):
+    m = machine
+    m.scan_start("copy")
+    snap = m.snapshot()
+    assert snap["screen"] == "scan_review" and snap["scans"] == 0 and snap["scan_quote"] is None
+    with pytest.raises(MachineError):
+        m.scan_done()                                  # nothing scanned yet
+    m.scan_more()
+    assert m.screen == "scanning"
+    seen = set()
+    while m.screen == "scanning":
+        if m.progress is not None:
+            seen.add(m.progress)
+        time.sleep(0.02)
+    assert m.screen == "scan_review" and len(m.scans) == 1
+    assert len(seen) > 1 and max(seen) <= 100          # progress reported while scanning
+    assert m.progress is None
+
+
+def test_first_scan_failure_returns_to_preview(machine):
+    m = machine
+
+    def broken(out, on_progress=None):
+        raise RuntimeError("lid open")
+    m.scanner.scan = broken
+    m.scan_start("copy")
+    m.scan_more()
+    wait_for(m, "scan_review")
+    assert m.scans == [] and "failed" in m.message
+
+
+# ---------- new: copies ----------
+
+def test_copies_change_price_and_respect_page_limit(machine):
+    m = machine
+    upload(m, 7)
+    assert m.snapshot()["job"]["copies"] == 1
+    assert m.snapshot()["job"]["max_copies"] == 7            # 50 // 7
+    m.set_copies(3)                                          # before choosing a mode: allowed
+    m.set_mode("bw")
+    assert m.job["price"] == 15                              # 21 pages, P5 per 10
+    m.set_copies(2)
+    assert m.job["price"] == 10                              # 14 pages
+    for bad in (0, -1, 8, "2", True):
+        with pytest.raises(MachineError):
+            m.set_copies(bad)
+    assert m.job["copies"] == 2
+    m.coin(10)
+    m.confirm()
+    wait_for(m, "done")
+    assert len(list((m.tmp / "out").glob("*bw_7p_x2.pdf"))) == 1
+    pay = [json.loads(l) for l in (m.tmp / "var" / "ledger.log").read_text().splitlines()
+           if '"pay"' in l][0]
+    assert pay["copies"] == 2
+
+
+def test_no_copies_for_scan_to_usb(machine):
+    m = machine
+    m.scan_start("usb")
+    m.scan_more()
+    wait_for(m, "scan_review")
+    m.scan_done()
+    with pytest.raises(MachineError):
+        m.set_copies(2)
+
+
+# ---------- new: phone sessions ----------
+
+def test_phone_session_is_random_and_ends(machine):
+    m = machine
+    m.phone_start()
+    s1 = m.session
+    wait_until(lambda: s1.state == "ready")
+    snap = m.snapshot()["phone"]
+    assert snap["ssid"] == s1.ssid and snap["password"] == s1.password and not snap["connected"]
+    lo, hi = m.cfg["server"]["upload_port_range"]
+    assert lo <= s1.port < hi and len(s1.password) == 10
+    m.cancel()
+    assert m.session is None and m.snapshot()["phone"] is None
+    m.phone_start()
+    s2 = m.session
+    assert (s2.ssid, s2.password, s2.token) != (s1.ssid, s1.password, s1.token)
+    assert not m.accepting_upload(s1)                        # old session is dead
+
+
+def wait_until(cond, timeout=5):
+    end = time.time() + timeout
+    while time.time() < end:
+        if cond():
+            return
+        time.sleep(0.02)
+    raise AssertionError("condition not met")
+
+
+def test_phone_upload_one_device_only(machine):
+    from fastapi.testclient import TestClient
+    from pathlib import Path
+    from app import upload as up
+    m = machine
+    m.phone_start()
+    ses = m.session
+    web = Path("web")
+    captive = TestClient(up.create_captive(ses))
+    r = captive.get("/generate_204", follow_redirects=False)        # Android probe
+    assert r.status_code == 302 and r.headers["location"] == ses.upload_url
+    r = captive.get("/hotspot-detect.html", follow_redirects=False)  # iPhone probe
+    assert r.status_code == 302
+
+    app = up.create(m, m.cfg, web, ses)
+    phone = TestClient(app, client=("10.42.0.20", 5000))
+    other = TestClient(app, client=("10.42.0.21", 5000))
+    assert phone.get("/").status_code == 404                         # token required
+    assert phone.get("/wrongtoken/").status_code == 404
+    assert phone.get(f"/{ses.token}/").status_code == 200            # claims the session
+    assert m.snapshot()["phone"]["connected"]
+    assert other.get(f"/{ses.token}/").status_code == 403
+    assert other.get(f"/{ses.token}/api/status").status_code == 403
+
+    pdf = m.tmp / "doc.pdf"
+    make_pdf(pdf, 2)
+    with open(pdf, "rb") as f:
+        r = phone.post(f"/{ses.token}/api/upload", files={"file": ("doc.pdf", f, "application/pdf")})
+    assert r.status_code == 200, r.text
+    wait_for(m, "choose")
+    assert m.session is None                                         # session over after upload
+    with open(pdf, "rb") as f:                                       # link can't be reused
+        r = phone.post(f"/{ses.token}/api/upload", files={"file": ("doc.pdf", f, "application/pdf")})
+    assert r.status_code == 409
+
+
+def test_hotspot_failure_shows_error(machine):
+    m = machine
+
+    class Broken:
+        def up(self, ssid, password):
+            raise RuntimeError("no wifi")
+
+        def down(self):
+            pass
+    m.phone.hotspot = Broken()
+    m.phone_start()
+    wait_for(m, "error")
+    assert "Wi-Fi" in m.message and m.session is None
+
+
+def test_wifi_qr_follows_session(machine):
+    from fastapi.testclient import TestClient
+    from pathlib import Path
+    from app import kiosk
+    m = machine
+    c = TestClient(kiosk.create(m, m.cfg, Path("web")))
+    assert c.get("/api/qr/wifi").status_code == 404                  # no session
+    c.post("/api/phone")
+    r = c.get("/api/qr/wifi")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"

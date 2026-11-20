@@ -9,18 +9,19 @@ One customer at a time. Python + FastAPI backend, plain HTML kiosk UI.
 config.toml              dev config (mock hardware). Prices live here.
 deploy/config.pi.toml    Pi config (real hardware)
 app/
-  main.py                starts both servers (kiosk 127.0.0.1:8001, upload 0.0.0.0:8000)
+  main.py                starts the kiosk server (127.0.0.1:8001)
+  phone.py               phone sessions: random hotspot + port + token, captive portal
   machine.py             THE logic: screens, paid amount, timeouts, ledger
   pricing.py             pesos * ceil(pages / pages_per_block)
   docs.py                Word/PPT -> PDF (LibreOffice), page count (pypdf)
   usb.py                 list flash drive files, save scans
   kiosk.py               touchscreen API (local only) + QR codes + dev coin route
-  upload.py              phone upload page API (the only thing phones can reach)
+  upload.py              captive portal + upload page per session (the only thing phones can reach)
   hw/mock.py             FilePrinter (PDFs into ./out), MockScanner
   hw/real.py             GpioCoinReader, CupsPrinter (lp/lpstat), SaneScanner (scanimage)
 web/kiosk/               800x480 UI (index.html, kiosk.js, kiosk.css)
 web/upload/index.html    phone upload page
-deploy/                  systemd unit, hotspot script, kiosk autostart, polkit rule
+deploy/                  systemd unit, hotspot setup (+ captive DNS, polkit rule), kiosk autostart
 tests/                   pytest: pricing + full flows with mock hardware
 var/                     state.json (paid amount) + ledger.log   (created at runtime)
 out/                     mock printer output                     (created at runtime)
@@ -33,7 +34,7 @@ fake_usb/                acts as a plugged-in flash drive in dev
 sudo pacman -S --needed python libreoffice-fresh poppler
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q          # 21 tests
+.venv/bin/python -m pytest -q
 .venv/bin/python -m app.main
 ```
 
@@ -42,12 +43,14 @@ python -m venv .venv
 sudo apt update && sudo apt install -y --no-install-recommends python3 python3-pip python3-venv libreoffice poppler-utils
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q          # 21 tests
+.venv/bin/python -m pytest -q
 .venv/bin/python -m app.main
 ```
 
 - Kiosk: http://127.0.0.1:8001 (open with a window of 800x480, e.g. devtools device mode)
-- Phone page: http://127.0.0.1:8000 (or `http://<your-LAN-IP>:8000` from a real phone; also set `upload_url`)
+- Phone: tap **Print from phone**, then open http://127.0.0.1:8000 (the captive portal) and it redirects
+  to this session's upload page. From a real phone on your LAN, set `[hotspot] host` to your PC's IP.
+  `hotspot = "mock"` leaves your Wi-Fi alone; the SSID/password on screen are just for show.
 - Insert coins (mock): press **1**, **5** or **0** (=P10) on the kiosk page, or
   `curl -XPOST localhost:8001/api/dev/coin -H 'content-type: application/json' -d '{"value":5}'`
 - Printed jobs land in `./out/`. Simulate problems: `touch out/JAM` (next print fails),
@@ -103,8 +106,10 @@ If `--mode=Color` errors, run `scanimage -A` to see your scanner's option names.
    ```
 4. RAM folder for uploads (add to `/etc/fstab`, then reboot):
    `tmpfs /tmp tmpfs defaults,noatime,nosuid,size=512m 0 0`
-5. Hotspot: `sudo raspi-config nonint do_wifi_country PH && sudo ./deploy/hotspot.sh KioskPrint 'yourpassword'`
-   (set up SSH over **Ethernet** first; the hotspot takes over wlan0). Put the same ssid/password in `deploy/config.pi.toml`.
+5. Hotspot: `sudo raspi-config nonint do_wifi_country PH && sudo ./deploy/hotspot.sh wlan0 kiosk`
+   (set up SSH over **Ethernet** first; the hotspot takes over wlan0). No password to set: every phone
+   session gets a random SSID + password. The script also installs the captive portal DNS rule and a
+   polkit rule so the `kiosk` user can switch the hotspot.
 6. Backend service: `sudo cp deploy/kiosk-print.service /etc/systemd/system/ && sudo systemctl enable --now kiosk-print`
 7. Kiosk: `sudo raspi-config nonint do_boot_behaviour B2`, `cat deploy/kiosk/bash_profile >> ~/.bash_profile`,
    `sudo cp deploy/kiosk/50-udiskie.rules /etc/polkit-1/rules.d/`, reboot.
@@ -122,7 +127,13 @@ If `--mode=Color` errors, run `scanimage -A` to see your scanner's option names.
 
 - Money: `paid` is saved to `var/state.json` after every coin. On payment it resets to 0; extra coins are forfeited (no change) and logged as `forfeit`.
 - A failed print shows a 6-character code; find it in `ledger.log` to refund by hand.
-- Phone uploads only accepted after "Print from phone" is tapped; anyone else gets "Machine busy".
+- Phone sessions: tapping "Print from phone" brings the hotspot up with a new random SSID + password and
+  starts the upload page on a random port under a random token. Joining the Wi-Fi (one QR) opens the page
+  by itself (captive portal). The first phone to open it owns the session; others get "another phone is
+  using this machine". On upload, cancel or timeout the servers stop and the hotspot goes down.
+- Captive portal on Android: the sign-in pop-up can't pick files (Android doesn't support it there), so the
+  page detects it and tells the customer to open 10.42.0.1 in Chrome. iPhone's pop-up can upload directly.
+- Copies: pages x copies counts toward `max_pages` and the price.
 - Files live in `work_dir` (RAM), are deleted after printing/failure/cancel/timeout, and the folder is wiped on start.
 - The kiosk/payment API listens on 127.0.0.1 only, so phones can't add coins or press Print.
 
@@ -130,7 +141,6 @@ If `--mode=Color` errors, run `scanimage -A` to see your scanner's option names.
 
 - Scan to USB costs the same as B&W printing (override with `[price] scan`). Scanning and rescanning are free; the scan screen shows a preview of each page and the running price.
 - CUPS "completed" means data sent, not paper out. Test on the real printer.
-- Captive portal skipped: customers scan two QR codes (Wi-Fi, then the URL).
 
 ## Tools Used For Development
 
