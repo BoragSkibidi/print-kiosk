@@ -1,12 +1,11 @@
-
 // Served under /<session token>/, so every API path here is relative ("api/...").
 const $ = id => document.getElementById(id);
- 
+
 let maxMB = 25;
 let allowed = [".pdf", ".doc", ".docx", ".ppt", ".pptx"];
 let chosen = null;          // the File picked by the customer
 let uploading = false;
- 
+
 // Android's captive portal window is a WebView ("; wv)" in the user agent) without
 // file picking. iPhone's sign-in window can pick files, so it uses the form directly.
 const ua = navigator.userAgent;
@@ -15,15 +14,15 @@ if (/Android/.test(ua) && /; wv\)/.test(ua)) {
   $("form").hidden = true;
   $("addr").textContent = location.hostname;     // the captive portal answers on port 80
 }
- 
+
 const fmtSize = b => b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1048576).toFixed(1)} MB`;
 const ext = name => (name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
- 
+
 function message(text, cls = "") {
   $("msg").className = cls;
   $("msg").textContent = text;
 }
- 
+
 // On every load (also the reload after an upload) the machine tells us where we are:
 // waiting = show the form, processing / ready = file is on the machine, failed, expired.
 fetch("api/status", {cache: "no-store"}).then(r => r.json()).then(s => {
@@ -34,7 +33,7 @@ fetch("api/status", {cache: "no-store"}).then(r => r.json()).then(s => {
   else if (s.stage === "failed") finished("failed", s.message);
   else if (!s.accepting) finished("expired");
 }).catch(() => {});
- 
+
 // ---------- choosing a file ----------
 function choose(file) {
   if (!file || uploading) return;
@@ -49,8 +48,10 @@ function choose(file) {
   $("card").hidden = false;
   $("progress").hidden = true;
   $("change").hidden = false;
+  $("change").textContent = "Change";
+  $("go").hidden = false;
   message("");
- 
+
   // Check here first so the customer doesn't wait for an upload that will be refused.
   let problem = "";
   if (!allowed.includes(e)) problem = "Only PDF, Word and PowerPoint files can be printed.";
@@ -59,15 +60,15 @@ function choose(file) {
   $("go").disabled = !!problem;
   if (problem) message(problem, "err");
 }
- 
+
 $("file").onchange = () => choose($("file").files[0]);
- 
+
 $("change").onclick = () => {
   if (uploading) return;
   $("file").value = "";
   $("file").click();
 };
- 
+
 // Drag and drop (computer browsers; phones just tap)
 const drop = $("drop");
 ["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => {
@@ -77,38 +78,38 @@ const drop = $("drop");
   e.preventDefault(); drop.classList.remove("over");
 }));
 drop.addEventListener("drop", e => choose(e.dataTransfer.files[0]));
- 
+
 // ---------- uploading ----------
 function setProgress(pct, state) {
   $("fill").style.width = `${pct}%`;
   $("pct").textContent = `${Math.round(pct)}%`;
   if (state) $("pstate").textContent = state;
 }
- 
+
 $("go").onclick = () => {
   if (!chosen || uploading) return;
   const form = new FormData();
   form.append("file", chosen);
   const xhr = new XMLHttpRequest();
   xhr.open("POST", "api/upload");
- 
+
   xhr.upload.onprogress = e => {
     if (!e.lengthComputable) return;
     setProgress(100 * e.loaded / e.total, `${fmtSize(e.loaded)} of ${fmtSize(e.total)}`);
   };
- 
+
   // Everything sent; the machine is saving the file before it answers.
   xhr.upload.onload = () => {
     $("fill").classList.add("busy");
     $("pstate").textContent = "Sending to the machine...";
     $("pct").textContent = "";
   };
- 
+
   const finish = () => {
     uploading = false;
     $("fill").classList.remove("busy");
   };
- 
+
   xhr.onload = () => {
     finish();
     let d = {}; try { d = JSON.parse(xhr.responseText); } catch {}
@@ -126,7 +127,7 @@ $("go").onclick = () => {
       message(d.detail || "Upload failed. Try again.", "err");
     }
   };
- 
+
   xhr.onerror = () => {
     finish();
     $("progress").hidden = true;
@@ -134,7 +135,7 @@ $("go").onclick = () => {
     $("go").disabled = false;
     message("Connection lost. Make sure you're still on the machine's Wi-Fi, then try again.", "err");
   };
- 
+
   uploading = true;
   $("go").disabled = true;
   $("change").hidden = true;
@@ -144,8 +145,8 @@ $("go").onclick = () => {
   message("");
   xhr.send(form);
 };
- 
- 
+
+
 // ---------- after the upload: follow the file, reload when the machine hangs up ----------
 // The machine can't push to the phone, so we ask every second. Once the file is on the
 // machine's screen we show "done". A few seconds later the machine stops its servers and
@@ -156,6 +157,13 @@ function watchMachine() {
     try {
       const s = await (await fetch("api/status", {cache: "no-store"})).json();
       misses = 0;
+      if (s.stage === "waiting" && s.message) {
+        // The machine couldn't open the file but kept the session: let them try again.
+        // No reload here; the page and the Wi-Fi stay as they are.
+        clearInterval(timer);
+        tryAgain(s.message);
+        return;
+      }
       if (!shown && s.stage !== "processing" && s.stage !== "waiting") {
         shown = true;
         finished(s.stage, s.message);
@@ -167,7 +175,21 @@ function watchMachine() {
     }
   }, 1000);
 }
- 
+
+// Back to the file card with the reason, so the customer can pick another file.
+function tryAgain(reason) {
+  uploading = false;
+  $("fill").className = "fill";
+  $("progress").hidden = true;
+  $("card").classList.add("bad");
+  $("change").hidden = false;
+  $("go").hidden = false;
+  $("go").disabled = true;            // same file would fail again: choose another first
+  $("change").textContent = "Choose another";
+  const r = /[.!?]$/.test(reason) ? reason : reason + ".";
+  message(`${r} Choose another file and upload again.`, "err");
+}
+
 // ---------- finished screen ----------
 function finished(stage, detail = "") {
   if (stage === "failed") {
@@ -182,4 +204,3 @@ function finished(stage, detail = "") {
   $("form").hidden = true;
   $("final").hidden = false;
 }
- 

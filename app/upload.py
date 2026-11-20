@@ -65,7 +65,7 @@ def create(machine, cfg, web: Path, session):
     def status():
         stage = machine.phone_stage(session)
         return {"accepting": stage == "waiting", "stage": stage,
-                "message": session.message if stage == "failed" else "",
+                "message": session.message,       # why the last file was refused, if it was
                 "max_mb": L["max_upload_mb"], "allowed": sorted(allowed)}
 
     @app.post(base + "/api/upload")

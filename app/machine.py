@@ -247,6 +247,8 @@ class Machine:
             if not self.accepting_upload(session):
                 shutil.rmtree(path.parent, ignore_errors=True)
                 raise MachineError("Machine busy")
+            if self.session:
+                self.session.message = ""         # new try: forget the last file's problem
             self._set("converting")
         self._spawn(self._prepare, path, name)
 
@@ -293,9 +295,16 @@ class Machine:
             if not isinstance(e, docs.DocError):
                 log.exception("prepare failed")
             shutil.rmtree(path.parent, ignore_errors=True)
+            msg = str(e) if isinstance(e, docs.DocError) else "Could not read this file"
             with self.lock:
                 if self.screen == "converting":
-                    self._set("error", str(e) if isinstance(e, docs.DocError) else "Could not read this file")
+                    if self.session:
+                        # Phone upload: keep the session (same Wi-Fi, same phone) so the
+                        # customer can just pick another file.
+                        self.session.message = msg
+                        self._set("phone_wait", msg)
+                    else:
+                        self._set("error", msg)
             return
         with self.lock:
             if self.screen != "converting":       # cancelled while converting

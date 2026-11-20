@@ -93,9 +93,26 @@ def test_too_many_pages(machine):
     m.phone_start()
     d = m.new_job_dir()
     make_pdf(d / "input.pdf", 51)
+    ses = m.session
     m.upload_received(d / "input.pdf", "big.pdf")
-    wait_for(m, "error")
+    wait_for(m, "phone_wait")                      # back to the phone screen, same session
     assert "Too many pages" in m.message
+    assert m.session is ses and "Too many pages" in ses.message
+    upload_again = m.new_job_dir()
+    make_pdf(upload_again / "input.pdf", 3)
+    m.upload_received(upload_again / "input.pdf", "small.pdf")
+    wait_for(m, "choose")
+    assert m.job["pages"] == 3
+
+
+def test_bad_file_from_usb_still_errors(machine):
+    m = machine
+    with m.lock:
+        m._set("converting")
+    d = m.new_job_dir()
+    (d / "input.pdf").write_bytes(b"not a pdf")
+    m._prepare(d / "input.pdf", "x.pdf")
+    assert m.screen == "error"
 
 
 def test_paper_jam_gives_code(machine):
@@ -472,6 +489,13 @@ def test_phone_page_sees_cancel_and_failure(machine):
     bad.write_bytes(b"not a pdf")
     with open(bad, "rb") as f:
         phone.post(f"/{ses.token}/api/upload", files={"file": ("bad.pdf", f, "application/pdf")})
-    wait_for(m, "error")
+    wait_until(lambda: m.screen == "phone_wait" and m.message)
     s = phone.get(f"/{ses.token}/api/status").json()
-    assert s["stage"] == "failed" and s["message"]
+    assert s["stage"] == "waiting" and s["accepting"] and s["message"]   # page offers a retry
+    good = m.tmp / "good.pdf"
+    make_pdf(good, 2)
+    with open(good, "rb") as f:                                         # same session, same phone
+        assert phone.post(f"/{ses.token}/api/upload",
+                          files={"file": ("good.pdf", f, "application/pdf")}).status_code == 200
+    wait_for(m, "choose")
+    assert phone.get(f"/{ses.token}/api/status").json()["stage"] == "ready"
