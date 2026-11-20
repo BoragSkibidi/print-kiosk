@@ -94,8 +94,13 @@ class Machine:
 
     # ---------- helpers ----------
     def _set(self, screen, message=""):
-        if self.session and screen != "phone_wait":     # leaving the phone screen
-            self.phone.end(self.session)
+        # The phone session lives through "converting" so the phone page can follow its file;
+        # it ends once the file is on screen (choose), fails (error) or is cancelled (idle).
+        if self.session and screen not in ("phone_wait", "converting"):
+            s = self.session
+            s.result = {"choose": "ready", "error": "failed"}.get(screen, "expired")
+            s.message = message
+            self.phone.end(s)
             self.session = None
         self.screen, self.message, self.since = screen, message, time.monotonic()
 
@@ -226,6 +231,13 @@ class Machine:
                 self._touch()
                 log.info("phone %s connected", ip)
             return session.owner == ip
+
+    def phone_stage(self, session):
+        """What the phone page shows: waiting | processing | ready | failed | expired."""
+        with self.lock:
+            if session is self.session:
+                return "waiting" if self.screen == "phone_wait" else "processing"
+            return session.result
 
     def accepting_upload(self, session=None):
         return self.screen == "phone_wait" and (session is None or session is self.session)

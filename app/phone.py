@@ -36,6 +36,8 @@ class Session:
         self.captive_port = s["captive_port"]
         self.state = "starting"     # starting | ready | failed
         self.owner = None           # IP of the phone that opened the upload page first
+        self.result = "expired"     # how it ended: ready | failed | expired (phone page shows it)
+        self.message = ""
  
     @property
     def upload_url(self):
@@ -91,7 +93,7 @@ class PhoneManager:
     """Starts and stops sessions. Slow work (Wi-Fi, servers) runs in background threads,
     one at a time; a session that is no longer current is simply skipped."""
  
-    END_GRACE_S = 4      # keep Wi-Fi up a moment so the phone gets the "uploaded" reply
+    END_GRACE_S = 6      # keep Wi-Fi up a moment so the phone page sees the result (it polls every 1 s)
  
     def __init__(self, cfg, hotspot=None, make_apps=None, serve=True):
         self.cfg = cfg

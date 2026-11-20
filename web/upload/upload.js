@@ -24,16 +24,15 @@ function message(text, cls = "") {
   $("msg").textContent = text;
 }
  
-// Limits and "is this link still good?" come from the machine.
-fetch("api/status").then(r => r.json()).then(s => {
+// On every load (also the reload after an upload) the machine tells us where we are:
+// waiting = show the form, processing / ready = file is on the machine, failed, expired.
+fetch("api/status", {cache: "no-store"}).then(r => r.json()).then(s => {
   if (s.max_mb) maxMB = s.max_mb;
   if (s.allowed) allowed = s.allowed;
   $("limits").textContent = `PDF, Word or PowerPoint · up to ${maxMB} MB`;
-  if (!s.accepting) {
-    $("busy").hidden = false;
-    $("drop").classList.add("disabled");
-    $("file").disabled = true;
-  }
+  if (s.stage === "processing" || s.stage === "ready") finished("ready");
+  else if (s.stage === "failed") finished("failed", s.message);
+  else if (!s.accepting) finished("expired");
 }).catch(() => {});
  
 // ---------- choosing a file ----------
@@ -114,11 +113,12 @@ $("go").onclick = () => {
     finish();
     let d = {}; try { d = JSON.parse(xhr.responseText); } catch {}
     if (xhr.status === 200) {
-      $("fill").classList.add("done");
-      setProgress(100, "Uploaded");
       $("go").hidden = true;
       $("change").hidden = true;
-      message("Done! Go to the machine to choose Colored or Black and white and pay. You can leave this Wi-Fi now.", "ok");
+      $("fill").classList.add("busy");        // uploaded; the machine is opening the file
+      $("pstate").textContent = "Opening on the machine...";
+      $("pct").textContent = "";
+      watchMachine();
     } else {
       $("progress").hidden = true;
       $("change").hidden = false;
@@ -144,4 +144,42 @@ $("go").onclick = () => {
   message("");
   xhr.send(form);
 };
+ 
+ 
+// ---------- after the upload: follow the file, reload when the machine hangs up ----------
+// The machine can't push to the phone, so we ask every second. Once the file is on the
+// machine's screen we show "done". A few seconds later the machine stops its servers and
+// turns the Wi-Fi off; the next check fails and we reload, which closes the session page.
+function watchMachine() {
+  let shown = false, misses = 0;
+  const timer = setInterval(async () => {
+    try {
+      const s = await (await fetch("api/status", {cache: "no-store"})).json();
+      misses = 0;
+      if (!shown && s.stage !== "processing" && s.stage !== "waiting") {
+        shown = true;
+        finished(s.stage, s.message);
+      }
+    } catch {
+      if (++misses < 2) return;                // one dropped request isn't the end
+      clearInterval(timer);
+      window.location.reload();                // server is gone: reload = page closed
+    }
+  }, 1000);
+}
+ 
+// ---------- finished screen ----------
+function finished(stage, detail = "") {
+  if (stage === "failed") {
+    $("final").classList.add("bad");
+    $("ftitle").textContent = "The machine couldn't open your file";
+    $("ftext").textContent = detail || "Check the machine's screen, then try another file.";
+  } else if (stage === "expired") {
+    $("ftitle").textContent = "This session has ended";
+    $("ftext").textContent = "Tap \"Print from phone\" on the machine to start again.";
+  }
+  if (stage === "failed" || stage === "expired") document.querySelector("#final .check").hidden = true;
+  $("form").hidden = true;
+  $("final").hidden = false;
+}
  

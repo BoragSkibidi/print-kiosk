@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
   <head>
@@ -7,10 +6,10 @@
     <title>Kiosk Print - Upload</title>
     <link rel="stylesheet" href="upload.css">
   </head>
- 
+
   <body>
     <h1>Kiosk Print</h1>
- 
+
     <!-- Android's Wi-Fi sign-in window can't open files: send the customer to Chrome -->
     <div id="android" class="box" hidden>
       <p><b>One more step</b></p>
@@ -21,11 +20,10 @@
       </ol>
       <p class="small">Stay on this Wi-Fi. If you see "no internet", choose to stay connected.</p>
     </div>
- 
+
     <div id="form">
       <p class="lead">Upload your file, then choose Colored or Black and white and pay at the machine.</p>
-      <p id="busy" class="err" hidden>This link has expired. Tap "Print from phone" on the machine again.</p>
- 
+
       <!-- 1. pick: the whole dashed box is the file button (tap, or drag a file onto it) -->
       <label id="drop" class="drop" for="file">
         <input id="file" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx">
@@ -38,7 +36,7 @@
         <span class="drop-title">Tap to choose a file</span>
         <span class="drop-sub" id="limits">PDF, Word or PowerPoint &middot; up to 25 MB</span>
       </label>
- 
+
       <!-- 2. chosen / uploading / done: file card with its own progress bar -->
       <div id="card" class="card" hidden>
         <div class="card-top">
@@ -54,13 +52,23 @@
           <div class="progress-text"><span id="pstate">Uploading...</span><span id="pct">0%</span></div>
         </div>
       </div>
- 
+
       <button id="go" disabled>Upload</button>
       <p id="msg" role="status"></p>
       <p class="small">Your file is deleted after printing.</p>
     </div>
- 
+
+    <!-- 3. the machine has the file: this page is finished -->
+    <div id="final" class="final" hidden>
+      <svg class="check" viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="22" fill="#11782f"/>
+        <path d="M14 25l7 7 13-14" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h2 id="ftitle">Your file is on the machine</h2>
+      <p id="ftext">Choose Colored or Black and white on the machine's screen, then pay there.</p>
+      <p class="small">You can close this page and leave the Wi-Fi.</p>
+    </div>
+
     <script src="upload.js"></script>
   </body>
 </html>
- 
