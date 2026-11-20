@@ -116,5 +116,9 @@ def create(machine: Machine, cfg, web: Path) -> None:
             m.coin(value); 
             return ok
 
+    @app.get("/")
+    def page():
+        return FileResponse(web / "kiosk" / "kiosk.html")
+
     app.mount("/", StaticFiles(directory= web / "kiosk", html=True), name="kiosk")
     return app

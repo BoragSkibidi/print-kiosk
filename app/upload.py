@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .machine import MachineError, Machine
@@ -89,6 +89,10 @@ def create(machine, cfg, web: Path, session):
         except MachineError as e:
             raise HTTPException(409, str(e))
         return {"ok": True}
+
+    @app.get("/")
+    def page():
+        return FileResponse(web / "upload" / "upload.html")
 
     app.mount(base, StaticFiles(directory=web / "upload", html=True), name="upload")
     return app
