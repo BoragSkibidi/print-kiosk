@@ -40,8 +40,8 @@ python -m venv .venv
 
 ## Run on Pi OS Lite (debug)
 ```sh
-sudo apt update && sudo apt install -y --no-install-recommends python3 python3-pip python3-venv libreoffice poppler-utils
-python -m venv .venv
+sudo apt install -y python3 python3-venv python3-pip libreoffice poppler-utils
+python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q
 .venv/bin/python -m app.main
