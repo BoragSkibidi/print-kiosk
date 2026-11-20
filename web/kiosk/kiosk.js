@@ -1,3 +1,4 @@
+
 // Kiosk UI: polls /api/state every 500 ms and draws the screen for the current state.
 const $app = document.getElementById("app");
 const $paid = document.getElementById("paid");
@@ -9,15 +10,15 @@ let usbPresent = null;
 let selPage = 0;       // scanned page shown in the preview (0-based)
 let seenScans = 0;     // page count last drawn, to jump to a newly scanned page
 let seenJob = null;    // job id last drawn on "choose", to start each job at page 1
-
+ 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const peso = n => "₱" + n;
-
+ 
 function toast(msg) {
   $toast.textContent = msg; $toast.hidden = false;
   clearTimeout(toast.t); toast.t = setTimeout(() => $toast.hidden = true, 3500);
 }
-
+ 
 async function api(path, body) {
   const opt = body === undefined ? {} :
     {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)};
@@ -27,13 +28,13 @@ async function api(path, body) {
   return data;
 }
 const post = (path, body = {}) => api(path, body).then(poll).catch(() => {});
-
+ 
 async function loadUsb() {
   usbFiles = null; draw(true);
   try { usbFiles = await api("/api/usb/files"); } catch { usbFiles = []; }
   draw(true);
 }
-
+ 
 const ACT = {
   phone: () => post("/api/phone"),
   usb: () => post("/api/usb"),          // draw() loads the file list
@@ -55,20 +56,20 @@ $app.addEventListener("click", e => {
   const b = e.target.closest("[data-act]");
   if (b && !b.disabled) ACT[b.dataset.act](b.dataset.arg);
 });
-
+ 
 // Dev only (hardware.coin = "mock"): keys 1, 5, 0 insert P1, P5, P10.
 document.addEventListener("keydown", e => {
   const coins = {"1": 1, "5": 5, "0": 10};
   if (S && S.mock_coins && coins[e.key]) api("/api/dev/coin", {value: coins[e.key]}).then(poll).catch(() => {});
 });
-
+ 
 const cancelBtn = (label = "Cancel") => `<button data-act="cancel">${label}</button>`;
-
+ 
 // Page images: scans while scanning, rendered PDF pages on "choose". ?v= changes per scan / job.
 const pageCount = s => s.screen === "choose" ? s.job.pages : s.scans;
 const pageSrc = (s, i, full) => (s.screen === "choose"
   ? `/api/job/preview/${i}?v=${s.job.id}` : `/api/scan/preview/${i}?v=${s.scan_pages[i]}`) + (full ? "&full=1" : "");
-
+ 
 // Loading / busy screen: spinner, title, optional line, optional progress bar.
 // pct = number -> real progress (scanner), pct = "busy" -> moving bar (no real progress known).
 const loader = (title, sub = "", pct = null) => `
@@ -81,7 +82,7 @@ const loader = (title, sub = "", pct = null) => `
 const bar = pct => pct === "busy"
   ? `<div class="bar busy"><div></div></div>`
   : `<div class="bar"><div style="width:${pct}%"></div></div><p class="small">${pct}%</p>`;
-
+ 
 // page strip (own scroll area) | big preview (tap = fullscreen) | side panel
 const pagesView = (s, side, empty = "") => {
   const n = pageCount(s);
@@ -97,7 +98,7 @@ const pagesView = (s, side, empty = "") => {
     <div class="side">${side}</div>
   </div>`;
 };
-
+ 
 const SCREENS = {
   idle: s => `
     <h1>Kiosk Print</h1>
@@ -111,13 +112,14 @@ const SCREENS = {
       ${peso(s.prices.bw.pesos)} = up to ${s.prices.bw.pages} black and white pages.
       Scan to flash drive: ${peso((s.prices.scan || s.prices.bw).pesos)} = up to ${(s.prices.scan || s.prices.bw).pages} pages.
       Scanning is free, pay only to print or save. No change given. Files are deleted after printing.</p>`,
-
+ 
   phone_wait: s => {
     const ph = s.phone;
     if (!ph || ph.state === "starting") return loader("Starting Wi-Fi...", "Getting a private hotspot ready for your phone.", "busy")
       + `<div class="row">${cancelBtn()}</div>`;
     return `
     <h2>Print from your phone</h2>
+    ${s.message ? `<p class="error">${esc(s.message.replace(/([^.!?])$/, "$1."))} Send another file from your phone.</p>` : ""}
     <div class="phone">
       <img class="qrcode" src="/api/qr/wifi?v=${encodeURIComponent(ph.ssid)}" alt="">
       <div class="steps">
@@ -133,16 +135,16 @@ const SCREENS = {
     <div class="spacer"></div>
     <div class="row">${cancelBtn()}</div>`;
   },
-
+ 
   usb: s => {
     let body;
     if (!s.usb_present) body = `
       <div class="center">
         <p class="big">Plug in your flash drive</p>
       </div>`;
-
+ 
     else if (usbFiles === null) body = loader("Reading flash drive...");
-
+ 
     else if (!usbFiles.length) body = `
       <div class="center">
         <p>No PDF, Word or PowerPoint files found.</p>
@@ -160,12 +162,12 @@ const SCREENS = {
       </div>`;
     return `<h2>Pick a file</h2>${body}<div class="row">${cancelBtn()}</div>`;
   },
-
+ 
   converting: () => loader("Processing your file...", "Please wait.", "busy") + `<div class="row">${cancelBtn()}</div>`,
-
+ 
   scanning: s => loader(s.rescan_index === null ? "Scanning..." : `Scanning page ${s.rescan_index + 1} again...`,
     "Keep the lid closed.", s.progress === null ? "busy" : s.progress),
-
+ 
   scan_review: s => {
     const n = s.scans, p = selPage, q = s.scan_quote, usbScan = s.scan_action === "usb";
     const price = !q ? "" : usbScan
@@ -196,7 +198,7 @@ const SCREENS = {
           <button class="primary" data-act="scandone">Done</button>
         </div>`);
   },
-
+ 
   choose: s => {
     const j = s.job, isPrint = j.action === "print";
     const due = j.price === null ? null : Math.max(j.price - s.paid, 0);
@@ -230,12 +232,12 @@ const SCREENS = {
           ${isPrint ? "Print" : "Save to flash drive"}</button>
       </div>`);
   },
-
+ 
   printing: s => loader("Printing...",
     s.job && s.job.copies > 1 ? `${s.job.copies} copies. Please wait for all pages.` : "Please wait for all pages.", "busy"),
-
+ 
   saving: () => loader("Saving...", "Do not remove your flash drive.", "busy"),
-
+ 
   done: s => `
     <div class="center">
       <p class="big">
@@ -249,7 +251,7 @@ const SCREENS = {
       ${cancelBtn("OK")}
     </div>
   `,
-
+ 
   error: s => `
     <div class="center">
       <p class="big error">
@@ -263,7 +265,7 @@ const SCREENS = {
       ${cancelBtn("OK")}
     </div>
   `,
-
+ 
   out_of_service: s => `
     <div class="center">
       <p class="big">
@@ -278,7 +280,7 @@ const SCREENS = {
     </div>
   `,
 };
-
+ 
 function draw(force) {
   if (!S) return;
   if (V && S.screen !== V.screen) closeViewer();            // timed out / cancelled under the viewer
@@ -304,7 +306,7 @@ function draw(force) {
   const strip2 = $app.querySelector(".strip");               // keep the strip where it was
   if (strip2) { strip2.scrollTop = top; strip2.querySelector(".selected")?.scrollIntoView({block: "nearest"}); }
 }
-
+ 
 // ---------- fullscreen page viewer: pinch or +/- to zoom, drag to pan, double-tap to toggle ----------
 const $viewer = document.getElementById("viewer");
 const $vstage = document.getElementById("vstage");
@@ -314,13 +316,13 @@ const $vpage = document.getElementById("vpage");
 const ZOOM_MAX = 5;
 let V = null;          // {screen, i, n, scale, x, y} while the viewer is open
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
-
+ 
 function openViewer() {
   V = {screen: S.screen, i: selPage, n: pageCount(S), scale: 1, x: 0, y: 0};
   $viewer.hidden = false;
   showPage();
 }
-
+ 
 function closeViewer() {
   if (!V) return;
   selPage = V.i;                                   // the page strip follows what was viewed
@@ -329,7 +331,7 @@ function closeViewer() {
   $vimg.removeAttribute("src");
   draw(true);
 }
-
+ 
 function showPage() {
   V.scale = 1; V.x = V.y = 0; applyZoom();
   $vload.textContent = "Loading..."; $vload.hidden = false;
@@ -340,14 +342,14 @@ function showPage() {
 }
 $vimg.onload = () => { $vload.hidden = true; };
 $vimg.onerror = () => { if (V) $vload.textContent = "Preview not available"; };
-
+ 
 function applyZoom() {          // keep the page from being dragged out of view
   const mx = Math.max(0, ($vimg.offsetWidth * V.scale - $vstage.clientWidth) / 2);
   const my = Math.max(0, ($vimg.offsetHeight * V.scale - $vstage.clientHeight) / 2);
   V.x = clamp(V.x, -mx, mx); V.y = clamp(V.y, -my, my);
   $vimg.style.transform = `translate(${V.x}px, ${V.y}px) scale(${V.scale})`;
 }
-
+ 
 function zoomAt(scale, cx, cy) {  // zoom keeping the point (cx, cy) under the finger
   const r = $vstage.getBoundingClientRect();
   const px = cx - (r.left + r.width / 2), py = cy - (r.top + r.height / 2);
@@ -357,14 +359,14 @@ function zoomAt(scale, cx, cy) {  // zoom keeping the point (cx, cy) under the f
   applyZoom();
 }
 const zoomCenter = f => { const r = $vstage.getBoundingClientRect(); zoomAt(V.scale * f, r.left + r.width / 2, r.top + r.height / 2); };
-
+ 
 $viewer.addEventListener("click", e => {
   const b = e.target.closest("[data-v]");
   if (!b || b.disabled || !V) return;
   ({prev: () => { V.i--; showPage(); }, next: () => { V.i++; showPage(); },
     in: () => zoomCenter(1.5), out: () => zoomCenter(1 / 1.5), close: closeViewer})[b.dataset.v]();
 });
-
+ 
 const pts = new Map();          // active fingers: pointerId -> {x, y}
 let pinch = null, lastTap = 0;
 const fingerDist = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
@@ -395,7 +397,7 @@ $vstage.addEventListener("wheel", e => {           // dev: mouse wheel zoom on t
   e.preventDefault();
   if (V) zoomAt(V.scale * (e.deltaY < 0 ? 1.25 : 0.8), e.clientX, e.clientY);
 }, {passive: false});
-
+ 
 async function poll() {
   try {
     const r = await fetch("/api/state");

@@ -94,8 +94,13 @@ class Machine:
 
     # ---------- helpers ----------
     def _set(self, screen, message=""):
-        if self.session and screen != "phone_wait":     # leaving the phone screen
-            self.phone.end(self.session)
+        # The phone session lives through "converting" so the phone page can follow its file;
+        # it ends once the file is on screen (choose), fails (error) or is cancelled (idle).
+        if self.session and screen not in ("phone_wait", "converting"):
+            s = self.session
+            s.result = {"choose": "ready", "error": "failed"}.get(screen, "expired")
+            s.message = message
+            self.phone.end(s)
             self.session = None
         self.screen, self.message, self.since = screen, message, time.monotonic()
 
@@ -227,6 +232,13 @@ class Machine:
                 log.info("phone %s connected", ip)
             return session.owner == ip
 
+    def phone_stage(self, session):
+        """What the phone page shows: waiting | processing | ready | failed | expired."""
+        with self.lock:
+            if session is self.session:
+                return "waiting" if self.screen == "phone_wait" else "processing"
+            return session.result
+
     def accepting_upload(self, session=None):
         return self.screen == "phone_wait" and (session is None or session is self.session)
 
@@ -235,6 +247,8 @@ class Machine:
             if not self.accepting_upload(session):
                 shutil.rmtree(path.parent, ignore_errors=True)
                 raise MachineError("Machine busy")
+            if self.session:
+                self.session.message = ""         # new try: forget the last file's problem
             self._set("converting")
         self._spawn(self._prepare, path, name)
 
@@ -281,9 +295,16 @@ class Machine:
             if not isinstance(e, docs.DocError):
                 log.exception("prepare failed")
             shutil.rmtree(path.parent, ignore_errors=True)
+            msg = str(e) if isinstance(e, docs.DocError) else "Could not read this file"
             with self.lock:
                 if self.screen == "converting":
-                    self._set("error", str(e) if isinstance(e, docs.DocError) else "Could not read this file")
+                    if self.session:
+                        # Phone upload: keep the session (same Wi-Fi, same phone) so the
+                        # customer can just pick another file.
+                        self.session.message = msg
+                        self._set("phone_wait", msg)
+                    else:
+                        self._set("error", msg)
             return
         with self.lock:
             if self.screen != "converting":       # cancelled while converting

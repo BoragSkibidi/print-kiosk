@@ -1,6 +1,7 @@
 """End-to-end flows with mock hardware (no printer, scanner or coin acceptor needed)."""
 import json
 import shutil
+import threading
 import time
 
 import pytest
@@ -92,9 +93,26 @@ def test_too_many_pages(machine):
     m.phone_start()
     d = m.new_job_dir()
     make_pdf(d / "input.pdf", 51)
+    ses = m.session
     m.upload_received(d / "input.pdf", "big.pdf")
-    wait_for(m, "error")
+    wait_for(m, "phone_wait")                      # back to the phone screen, same session
     assert "Too many pages" in m.message
+    assert m.session is ses and "Too many pages" in ses.message
+    upload_again = m.new_job_dir()
+    make_pdf(upload_again / "input.pdf", 3)
+    m.upload_received(upload_again / "input.pdf", "small.pdf")
+    wait_for(m, "choose")
+    assert m.job["pages"] == 3
+
+
+def test_bad_file_from_usb_still_errors(machine):
+    m = machine
+    with m.lock:
+        m._set("converting")
+    d = m.new_job_dir()
+    (d / "input.pdf").write_bytes(b"not a pdf")
+    m._prepare(d / "input.pdf", "x.pdf")
+    assert m.screen == "error"
 
 
 def test_paper_jam_gives_code(machine):
@@ -419,3 +437,65 @@ def test_wifi_qr_follows_session(machine):
     c.post("/api/phone")
     r = c.get("/api/qr/wifi")
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+
+
+def test_phone_page_follows_file_to_the_machine(machine):
+    from fastapi.testclient import TestClient
+    from pathlib import Path
+    from app import upload as up
+    m = machine
+    m.phone_start()
+    ses = m.session
+    phone = TestClient(up.create(m, m.cfg, Path("web"), ses), client=("10.42.0.20", 5000))
+    st = lambda: phone.get(f"/{ses.token}/api/status").json()
+    assert st()["stage"] == "waiting" and st()["accepting"]
+
+    # hold conversion so we can see "processing"
+    gate = threading.Event()
+    real_count = m._prepare
+
+    def slow_prepare(*a, **k):
+        gate.wait(5)
+        return real_count(*a, **k)
+    m._prepare = slow_prepare
+    pdf = m.tmp / "doc.pdf"
+    make_pdf(pdf, 2)
+    with open(pdf, "rb") as f:
+        assert phone.post(f"/{ses.token}/api/upload",
+                          files={"file": ("doc.pdf", f, "application/pdf")}).status_code == 200
+    assert m.session is ses                        # still open while converting
+    assert st()["stage"] == "processing" and not st()["accepting"]
+    gate.set()
+    wait_for(m, "choose")
+    assert m.session is None and st()["stage"] == "ready"
+
+
+def test_phone_page_sees_cancel_and_failure(machine):
+    from fastapi.testclient import TestClient
+    from pathlib import Path
+    from app import upload as up
+    m = machine
+    m.phone_start()
+    ses = m.session
+    phone = TestClient(up.create(m, m.cfg, Path("web"), ses), client=("10.42.0.20", 5000))
+    assert phone.get(f"/{ses.token}/").status_code == 200      # phone opened the page
+    m.cancel()
+    assert phone.get(f"/{ses.token}/api/status").json()["stage"] == "expired"
+
+    m.phone_start()
+    ses = m.session
+    phone = TestClient(up.create(m, m.cfg, Path("web"), ses), client=("10.42.0.20", 5000))
+    bad = m.tmp / "bad.pdf"
+    bad.write_bytes(b"not a pdf")
+    with open(bad, "rb") as f:
+        phone.post(f"/{ses.token}/api/upload", files={"file": ("bad.pdf", f, "application/pdf")})
+    wait_until(lambda: m.screen == "phone_wait" and m.message)
+    s = phone.get(f"/{ses.token}/api/status").json()
+    assert s["stage"] == "waiting" and s["accepting"] and s["message"]   # page offers a retry
+    good = m.tmp / "good.pdf"
+    make_pdf(good, 2)
+    with open(good, "rb") as f:                                         # same session, same phone
+        assert phone.post(f"/{ses.token}/api/upload",
+                          files={"file": ("good.pdf", f, "application/pdf")}).status_code == 200
+    wait_for(m, "choose")
+    assert phone.get(f"/{ses.token}/api/status").json()["stage"] == "ready"

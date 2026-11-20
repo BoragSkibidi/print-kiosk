@@ -63,7 +63,10 @@ def create(machine, cfg, web: Path, session):
 
     @app.get(base + "/api/status")
     def status():
-        return {"accepting": machine.accepting_upload(session)}
+        stage = machine.phone_stage(session)
+        return {"accepting": stage == "waiting", "stage": stage,
+                "message": session.message,       # why the last file was refused, if it was
+                "max_mb": L["max_upload_mb"], "allowed": sorted(allowed)}
 
     @app.post(base + "/api/upload")
     async def upload(file: UploadFile = File(...)):
