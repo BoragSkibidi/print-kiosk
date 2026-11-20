@@ -62,8 +62,7 @@ def main():
     ]
  
     log.info("kiosk  http://127.0.0.1:%d", s["kiosk_port"])
-    log.info("phone sessions: captive portal on port %d, upload on a random port %s",
-             s["captive_port"], s["upload_port_range"])
+    log.info("phone sessions: captive portal on port %d, upload on a random port %s", s["captive_port"], s["upload_port_range"])
     log.info("hardware: %s", cfg["hardware"])
     asyncio.run(serve(servers))
  
