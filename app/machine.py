@@ -192,7 +192,7 @@ class Machine:
                 "mock_coins": self.cfg["hardware"]["coin"] == "mock",
                 "phone": None if not ses else {
                     "state": ses.state, "ssid": ses.ssid, "password": ses.password,
-                    "url": ses.portal_url, "connected": ses.owner is not None},
+                    "url": ses.upload_url, "connected": ses.owner is not None},
             }
 
     # ---------- coins (called by the coin reader thread, never by a phone) ----------

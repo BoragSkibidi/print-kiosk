@@ -6,15 +6,6 @@ let allowed = [".pdf", ".doc", ".docx", ".ppt", ".pptx"];
 let chosen = null;          // the File picked by the customer
 let uploading = false;
 
-// Android's captive portal window is a WebView ("; wv)" in the user agent) without
-// file picking. iPhone's sign-in window can pick files, so it uses the form directly.
-const ua = navigator.userAgent;
-if (/Android/.test(ua) && /; wv\)/.test(ua)) {
-  $("android").hidden = false;
-  $("form").hidden = true;
-  $("addr").textContent = location.hostname;     // the captive portal answers on port 80
-}
-
 const fmtSize = b => b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1048576).toFixed(1)} MB`;
 const ext = name => (name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
 
