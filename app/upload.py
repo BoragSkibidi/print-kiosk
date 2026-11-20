@@ -63,7 +63,8 @@ def create(machine, cfg, web: Path, session):
 
     @app.get(base + "/api/status")
     def status():
-        return {"accepting": machine.accepting_upload(session)}
+        return {"accepting": machine.accepting_upload(session),
+                "max_mb": L["max_upload_mb"], "allowed": sorted(allowed)}
 
     @app.post(base + "/api/upload")
     async def upload(file: UploadFile = File(...)):
