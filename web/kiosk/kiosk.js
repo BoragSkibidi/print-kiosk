@@ -1,4 +1,3 @@
-
 // Kiosk UI: polls /api/state every 500 ms and draws the screen for the current state.
 const $app = document.getElementById("app");
 const $paid = document.getElementById("paid");
@@ -117,21 +116,32 @@ const SCREENS = {
     const ph = s.phone;
     if (!ph || ph.state === "starting") return loader("Starting Wi-Fi...", "Getting a private hotspot ready for your phone.", "busy")
       + `<div class="row">${cancelBtn()}</div>`;
+    const err = s.message
+      ? `<p class="error">${esc(s.message.replace(/([^.!?])$/, "$1."))} Send another file from your phone.</p>` : "";
+    const v = encodeURIComponent(ph.ssid);
+    const body = ph.connected ? `
+      <div class="center">
+        <p class="ok big">Phone connected</p>
+        <p>Pick your file on your phone and tap <b>Upload</b>.</p>
+      </div>` : `
+      <div class="qrs">
+        <div class="qr">
+          <p class="step"><b>1.</b> Join the Wi-Fi</p>
+          <img class="qrcode" src="/api/qr/wifi?v=${v}" alt="">
+          <p class="small">Wi-Fi: <b>${esc(ph.ssid)}</b><br>Password: <b>${esc(ph.password)}</b></p>
+        </div>
+        <div class="qr">
+          <p class="step"><b>2.</b> Open the upload page</p>
+          <img class="qrcode" src="/api/qr/url?v=${v}" alt="">
+          <p class="small">${esc(ph.url.replace(/^http:\/\//, ""))}</p>
+        </div>
+      </div>
+      <p class="small hint">Scan both with your phone camera, in order. Page won't load? Turn off mobile data
+        and stay on this Wi-Fi. New Wi-Fi every time, one phone at a time.</p>`;
     return `
     <h2>Print from your phone</h2>
-    ${s.message ? `<p class="error">${esc(s.message.replace(/([^.!?])$/, "$1."))} Send another file from your phone.</p>` : ""}
-    <div class="phone">
-      <img class="qrcode" src="/api/qr/wifi?v=${encodeURIComponent(ph.ssid)}" alt="">
-      <div class="steps">
-        ${ph.connected ? `<p class="ok big">Phone connected</p>
-          <p>Pick your file on your phone and tap <b>Upload</b>.</p>` : `
-        <p><b>1.</b> Scan with your phone camera to join the Wi-Fi.</p>
-        <p><b>2.</b> The upload page opens by itself.</p>`}
-        <p class="small">Wi-Fi: <b>${esc(ph.ssid)}</b> &nbsp; Password: <b>${esc(ph.password)}</b><br>
-          Page didn't open? Go to <b>${esc(ph.url.replace(/^http:\/\//, "").replace(/\/$/, ""))}</b> in your browser.<br>
-          New Wi-Fi and password every time. One phone at a time.</p>
-      </div>
-    </div>
+    ${err}
+    ${body}
     <div class="spacer"></div>
     <div class="row">${cancelBtn()}</div>`;
   },

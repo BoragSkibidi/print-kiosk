@@ -17,10 +17,9 @@ nmcli con add type wifi ifname "$IFACE" con-name kiosk-hotspot autoconnect no ss
   ipv4.method shared ipv4.addresses 10.42.0.1/24 ipv6.method disabled \
   wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$(head -c 12 /dev/urandom | base64)"
 
-# 2. Captive portal DNS: every name resolves to the Pi, so the phone's
-#    "am I online?" check lands on our portal and the upload page pops up.
-mkdir -p /etc/NetworkManager/dnsmasq-shared.d
-install -m 644 "$HERE/dnsmasq-captive.conf" /etc/NetworkManager/dnsmasq-shared.d/kiosk-captive.conf
+# 2. No captive portal (phones get two QR codes instead). Remove the old DNS rule if an
+#    earlier version installed it: it sent every name to the Pi and confused phones.
+rm -f /etc/NetworkManager/dnsmasq-shared.d/kiosk-captive.conf
 
 # 3. Let the app's user switch the hotspot on/off without root.
 sed "s/\"kiosk\"/\"$APP_USER\"/" "$HERE/50-kiosk-hotspot.rules" > /etc/polkit-1/rules.d/50-kiosk-hotspot.rules

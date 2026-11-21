@@ -1,7 +1,8 @@
+
 [hidden] {
   display: none !important;     /* .drop etc. set display, which would beat the hidden attribute */
 }
-
+ 
 body {
   font-family: system-ui, sans-serif;
   max-width: 480px;
@@ -9,20 +10,20 @@ body {
   padding: 24px;
   color: #111;
 }
-
+ 
 h1 {
   font-size: 26px;
   margin: 0 0 8px;
 }
-
+ 
 p {
   line-height: 1.4;
 }
-
+ 
 .lead {
   margin-top: 0;
 }
-
+ 
 button {
   width: 100%;
   font-size: 20px;
@@ -33,11 +34,11 @@ button {
   background: #111;
   color: #fff;
 }
-
+ 
 button:disabled {
   opacity: .4;
 }
-
+ 
 /* ---------- dashed drop box ---------- */
 .drop {
   display: flex;
@@ -53,13 +54,13 @@ button:disabled {
   cursor: pointer;
   transition: border-color .15s, background .15s;
 }
-
+ 
 .drop:active,
 .drop.over {                     /* finger down, or a file dragged over it */
   border-color: #111;
   background: #f0f0f0;
 }
-
+ 
 .drop input {                    /* hidden but still opens the picker */
   position: absolute;
   width: 1px;
@@ -67,28 +68,28 @@ button:disabled {
   opacity: 0;
   pointer-events: none;
 }
-
+ 
 .drop .icon {
   width: 52px;
   height: 52px;
   color: #111;
 }
-
+ 
 .drop-title {
   font-size: 19px;
   font-weight: 600;
 }
-
+ 
 .drop-sub {
   font-size: 14px;
   color: #555;
 }
-
+ 
 .drop.disabled {
   opacity: .4;
   pointer-events: none;
 }
-
+ 
 /* ---------- chosen file card ---------- */
 .card {
   margin: 20px 0;
@@ -96,17 +97,17 @@ button:disabled {
   border: 2px solid #111;
   border-radius: 14px;
 }
-
+ 
 .card.bad {
   border-color: #b00020;
 }
-
+ 
 .card-top {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-
+ 
 .kind {                          /* PDF / DOC / PPT badge */
   flex: none;
   width: 46px;
@@ -122,23 +123,23 @@ button:disabled {
   padding-bottom: 8px;
   box-sizing: border-box;
 }
-
+ 
 .kind.pdf { background: #c62828; }
 .kind.doc { background: #1e5bb8; }
 .kind.ppt { background: #c4501b; }
-
+ 
 .card-info {
   flex: 1;
   min-width: 0;
 }
-
+ 
 .fname {
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
+ 
 button.link {
   width: auto;
   padding: 6px 4px;
@@ -148,19 +149,19 @@ button.link {
   border: none;
   text-decoration: underline;
 }
-
+ 
 /* ---------- progress ---------- */
 .progress {
   margin-top: 14px;
 }
-
+ 
 .track {
   height: 10px;
   border-radius: 5px;
   background: #e6e6e6;
   overflow: hidden;
 }
-
+ 
 .fill {
   width: 0;
   height: 100%;
@@ -168,21 +169,21 @@ button.link {
   background: #111;
   transition: width .2s ease;
 }
-
+ 
 .fill.done {
   background: #11782f;
 }
-
+ 
 .fill.busy {                     /* upload sent, machine is reading the file */
   width: 35% !important;
   animation: busy 1.2s ease-in-out infinite;
 }
-
+ 
 @keyframes busy {
   from { transform: translateX(-100%); }
   to { transform: translateX(300%); }
 }
-
+ 
 .progress-text {
   display: flex;
   justify-content: space-between;
@@ -190,59 +191,47 @@ button.link {
   font-size: 14px;
   color: #555;
 }
-
+ 
 /* ---------- messages ---------- */
 #msg {
   margin-top: 16px;
   font-weight: 600;
 }
-
+ 
 #msg:empty {
   display: none;
 }
-
+ 
 .err {
   color: #b00020;
 }
-
+ 
 .ok {
   color: #11782f;
 }
-
+ 
 .small {
   font-size: 14px;
   color: #555;
 }
-
-.box {
-  border: 2px solid #111;
-  border-radius: 10px;
-  padding: 14px 16px;
-  margin: 16px 0;
-  background: #fff8d6;
-}
-
-.box ol {
-  margin: 10px 0 10px 20px;
-  line-height: 1.6;
-}
-
+ 
+ 
 /* ---------- finished ---------- */
 .final {
   text-align: center;
   padding: 40px 8px;
 }
-
+ 
 .final .check {
   width: 84px;
   height: 84px;
 }
-
+ 
 .final h2 {
   margin: 18px 0 8px;
   font-size: 24px;
 }
-
+ 
 .final.bad h2 {
   color: #b00020;
 }

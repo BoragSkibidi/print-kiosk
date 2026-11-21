@@ -1,25 +1,19 @@
-"""Phone-facing apps, one pair per phone session (see phone.py).
-
-captive: every request on the captive port (80 on the Pi) -> redirect to the upload page.
-         Phones probe a known URL right after joining Wi-Fi; getting a redirect instead
-         of the expected answer makes them open the page automatically.
-upload:  the upload page + API, only under /<token>/ and only for the first phone.
-"""
+"""Phone-facing upload page + API, one app per phone session (see phone.py).
+Served only under /<token>/ and only to the first phone that opens it."""
 import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .machine import MachineError
+from .machine import MachineError, Machine
 
 BUSY_PAGE = """<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
 <title>Kiosk Print</title><body style="font-family:sans-serif;padding:24px">
 <h2>Another phone is using this machine</h2>
 <p>Only one phone can upload at a time. Wait for it to finish, then tap
 <b>Print from phone</b> on the machine again.</p></body>"""
-
 
 def create_captive(session):
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -31,7 +25,6 @@ def create_captive(session):
                                 headers={"Cache-Control": "no-store"})
 
     return app
-
 
 def create(machine, cfg, web: Path, session):
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -94,6 +87,10 @@ def create(machine, cfg, web: Path, session):
         except MachineError as e:
             raise HTTPException(409, str(e))
         return {"ok": True}
+
+    @app.get("/")
+    def page():
+        return FileResponse(web / "upload" / "upload.html")
 
     app.mount(base, StaticFiles(directory=web / "upload", html=True), name="upload")
     return app

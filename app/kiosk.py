@@ -97,6 +97,16 @@ def create(machine: Machine, cfg, web: Path) -> None:
     def cancel():
         m.cancel(); return ok
 
+    @app.get("/api/qr/url")
+    def qr_url():
+        # QR 2: this session's upload page (random port + token)
+        ses = m.session
+        if not ses:
+            raise HTTPException(404)
+        png = _qr_png(ses.upload_url)
+        png.headers["Cache-Control"] = "no-store"
+        return png
+
     @app.get("/api/qr/wifi")
     def qr_wifi():
         # Made fresh for the current phone session: new SSID + password every time.
@@ -115,6 +125,10 @@ def create(machine: Machine, cfg, web: Path) -> None:
                 raise HTTPException(400, "coin must be 1, 5, 10 or 20")
             m.coin(value); 
             return ok
+
+    @app.get("/")
+    def page():
+        return FileResponse(web / "kiosk" / "kiosk.html")
 
     app.mount("/", StaticFiles(directory= web / "kiosk", html=True), name="kiosk")
     return app

@@ -384,11 +384,6 @@ def test_phone_upload_one_device_only(machine):
     m.phone_start()
     ses = m.session
     web = Path("web")
-    captive = TestClient(up.create_captive(ses))
-    r = captive.get("/generate_204", follow_redirects=False)        # Android probe
-    assert r.status_code == 302 and r.headers["location"] == ses.upload_url
-    r = captive.get("/hotspot-detect.html", follow_redirects=False)  # iPhone probe
-    assert r.status_code == 302
 
     app = up.create(m, m.cfg, web, ses)
     phone = TestClient(app, client=("10.42.0.20", 5000))
@@ -437,6 +432,10 @@ def test_wifi_qr_follows_session(machine):
     c.post("/api/phone")
     r = c.get("/api/qr/wifi")
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    assert c.get("/api/qr/url").status_code == 200                   # QR 2: the upload page
+    assert m.snapshot()["phone"]["url"] == m.session.upload_url
+    c.post("/api/cancel")
+    assert c.get("/api/qr/url").status_code == 404
 
 
 def test_phone_page_follows_file_to_the_machine(machine):
