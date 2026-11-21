@@ -38,13 +38,12 @@ class GpioCoinReader:
             self.timer = threading.Timer(self.gap, self._finish)
             self.timer.daemon = True
             self.timer.start()
+        self.on_coin(self.per)                # credit now, don't wait for the coin to end
 
     def _finish(self):
         with self.lock:
             n, self.pulses, self.timer = self.pulses, 0, None
         log.info("coin: %d pulses -> P%d", n, n * self.per)
-        if n:
-            self.on_coin(n * self.per)
 
 
 def _run(cmd, timeout=15):

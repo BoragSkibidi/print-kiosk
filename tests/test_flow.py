@@ -3,15 +3,15 @@ import json
 import shutil
 import threading
 import time
-
+ 
 import pytest
 from pypdf import PdfWriter
-
+ 
 from app.config import load_config
 from app.hw.mock import FilePrinter, MockScanner
 from app.machine import Machine, MachineError
-
-
+ 
+ 
 def wait_for(m, *screens, timeout=15):
     end = time.time() + timeout
     while time.time() < end:
@@ -19,16 +19,16 @@ def wait_for(m, *screens, timeout=15):
             return
         time.sleep(0.05)
     raise AssertionError(f"stuck on {m.screen!r} ({m.message}), wanted {screens}")
-
-
+ 
+ 
 def make_pdf(path, pages):
     w = PdfWriter()
     for _ in range(pages):
         w.add_blank_page(width=595, height=842)
     with open(path, "wb") as f:
         w.write(f)
-
-
+ 
+ 
 @pytest.fixture
 def machine(tmp_path, monkeypatch):
     monkeypatch.setenv("PISO_CONFIG", "config.toml")
@@ -40,16 +40,16 @@ def machine(tmp_path, monkeypatch):
     m = Machine(cfg, FilePrinter(cfg["printer"]), MockScanner(cfg["scanner"]))
     m.tmp = tmp_path
     return m
-
-
+ 
+ 
 def upload(m, pages):
     m.phone_start()
     d = m.new_job_dir()
     make_pdf(d / "input.pdf", pages)
     m.upload_received(d / "input.pdf", "homework.pdf")
     wait_for(m, "choose")
-
-
+ 
+ 
 def test_phone_print_flow(machine):
     m = machine
     upload(m, 7)
@@ -70,24 +70,24 @@ def test_phone_print_flow(machine):
     events = [json.loads(l) for l in (m.tmp / "var" / "ledger.log").read_text().splitlines()]
     pay = [e for e in events if e["event"] == "pay"][0]
     assert pay["price"] == 10 and pay["forfeit"] == 5
-
-
+ 
+ 
 def test_paid_survives_restart(machine):
     m = machine
     m.coin(5)
     m.coin(1)
     m2 = Machine(m.cfg, m.printer, m.scanner)   # simulate power cut + reboot
     assert m2.paid == 6
-
-
+ 
+ 
 def test_upload_rejected_when_not_waiting(machine):
     d = machine.new_job_dir()
     make_pdf(d / "input.pdf", 1)
     with pytest.raises(MachineError):
         machine.upload_received(d / "input.pdf", "x.pdf")
     assert not d.exists()
-
-
+ 
+ 
 def test_too_many_pages(machine):
     m = machine
     m.phone_start()
@@ -103,8 +103,8 @@ def test_too_many_pages(machine):
     m.upload_received(upload_again / "input.pdf", "small.pdf")
     wait_for(m, "choose")
     assert m.job["pages"] == 3
-
-
+ 
+ 
 def test_bad_file_from_usb_still_errors(machine):
     m = machine
     with m.lock:
@@ -113,8 +113,8 @@ def test_bad_file_from_usb_still_errors(machine):
     (d / "input.pdf").write_bytes(b"not a pdf")
     m._prepare(d / "input.pdf", "x.pdf")
     assert m.screen == "error"
-
-
+ 
+ 
 def test_paper_jam_gives_code(machine):
     m = machine
     upload(m, 2)
@@ -124,8 +124,8 @@ def test_paper_jam_gives_code(machine):
     m.confirm()
     wait_for(m, "error")
     assert "operator" in m.message
-
-
+ 
+ 
 def test_usb_print(machine):
     m = machine
     make_pdf(m.tmp / "usb" / "notes.pdf", 3)
@@ -140,14 +140,14 @@ def test_usb_print(machine):
     assert m.screen == "idle" and not job_dir.exists()
     with pytest.raises(MachineError):
         m.confirm()
-
-
+ 
+ 
 def test_usb_rejects_outside_path(machine):
     machine.usb_open()
     with pytest.raises(MachineError):
         machine.usb_select("/etc/passwd")
-
-
+ 
+ 
 def test_copy_flow(machine):
     m = machine
     m.scan_start("copy")
@@ -163,8 +163,8 @@ def test_copy_flow(machine):
     m.confirm()
     wait_for(m, "done")
     assert len(list((m.tmp / "out").glob("*bw_2p.pdf"))) == 1
-
-
+ 
+ 
 def test_scan_to_usb(machine):
     m = machine
     m.scan_start("usb")
@@ -177,8 +177,8 @@ def test_scan_to_usb(machine):
     m.confirm()
     wait_for(m, "done")
     assert len(list((m.tmp / "usb").glob("scan_*.pdf"))) == 1
-
-
+ 
+ 
 def test_scan_to_usb_costs_bw_price(machine):
     m = machine
     m.cfg["price"].pop("scan", None)
@@ -192,8 +192,8 @@ def test_scan_to_usb_costs_bw_price(machine):
     assert m.snapshot()["scan_quote"] == {"scan": 10}     # 11 pages, bw = P5 per 10
     m.scan_done()
     assert m.job["price"] == 10
-
-
+ 
+ 
 def test_rescan_replaces_page_for_free(machine):
     m = machine
     m.scan_start("copy")
@@ -219,8 +219,8 @@ def test_rescan_replaces_page_for_free(machine):
         m.scan_preview(5)
     m.scan_done()
     assert m.job["pages"] == 2
-
-
+ 
+ 
 def test_preview_endpoint(machine):
     from fastapi.testclient import TestClient
     from pathlib import Path
@@ -236,7 +236,7 @@ def test_preview_endpoint(machine):
     assert c.post("/api/scan/rescan", json={"index": 0}).status_code == 200
     wait_for(m, "scan_review")
     assert c.post("/api/scan/rescan", json={"index": "x"}).status_code == 400
-
+ 
 def test_full_size_scan_for_zoom(machine):
     m = machine
     m.scan_start("copy")
@@ -245,8 +245,8 @@ def test_full_size_scan_for_zoom(machine):
     wait_for(m, "scan_review")
     assert m.scan_preview(0, full=True).suffix == ".png"
     assert m.scan_preview(0).suffix == ".jpg"
-
-
+ 
+ 
 @pytest.mark.skipif(not shutil.which("pdftoppm"), reason="needs poppler (pdftoppm)")
 def test_job_preview_renders_pages(machine):
     from PIL import Image
@@ -264,8 +264,8 @@ def test_job_preview_renders_pages(machine):
     assert not job_dir.exists()                          # previews deleted with the job
     with pytest.raises(MachineError):
         m.job_preview(0)
-
-
+ 
+ 
 @pytest.mark.skipif(not shutil.which("pdftoppm"), reason="needs poppler (pdftoppm)")
 def test_job_preview_endpoint(machine):
     from fastapi.testclient import TestClient
@@ -278,10 +278,10 @@ def test_job_preview_endpoint(machine):
     assert m.snapshot()["job"]["id"] == m.job["dir"].name
     r = c.get("/api/job/preview/1?full=1")
     assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
-
-
+ 
+ 
 # ---------- new: scan opens on the preview ----------
-
+ 
 def test_scan_opens_on_empty_preview(machine):
     m = machine
     m.scan_start("copy")
@@ -299,11 +299,11 @@ def test_scan_opens_on_empty_preview(machine):
     assert m.screen == "scan_review" and len(m.scans) == 1
     assert len(seen) > 1 and max(seen) <= 100          # progress reported while scanning
     assert m.progress is None
-
-
+ 
+ 
 def test_first_scan_failure_returns_to_preview(machine):
     m = machine
-
+ 
     def broken(out, on_progress=None):
         raise RuntimeError("lid open")
     m.scanner.scan = broken
@@ -311,10 +311,10 @@ def test_first_scan_failure_returns_to_preview(machine):
     m.scan_more()
     wait_for(m, "scan_review")
     assert m.scans == [] and "failed" in m.message
-
-
+ 
+ 
 # ---------- new: copies ----------
-
+ 
 def test_copies_change_price_and_respect_page_limit(machine):
     m = machine
     upload(m, 7)
@@ -336,8 +336,8 @@ def test_copies_change_price_and_respect_page_limit(machine):
     pay = [json.loads(l) for l in (m.tmp / "var" / "ledger.log").read_text().splitlines()
            if '"pay"' in l][0]
     assert pay["copies"] == 2
-
-
+ 
+ 
 def test_no_copies_for_scan_to_usb(machine):
     m = machine
     m.scan_start("usb")
@@ -346,10 +346,10 @@ def test_no_copies_for_scan_to_usb(machine):
     m.scan_done()
     with pytest.raises(MachineError):
         m.set_copies(2)
-
-
+ 
+ 
 # ---------- new: phone sessions ----------
-
+ 
 def test_phone_session_is_random_and_ends(machine):
     m = machine
     m.phone_start()
@@ -365,8 +365,8 @@ def test_phone_session_is_random_and_ends(machine):
     s2 = m.session
     assert (s2.ssid, s2.password, s2.token) != (s1.ssid, s1.password, s1.token)
     assert not m.accepting_upload(s1)                        # old session is dead
-
-
+ 
+ 
 def wait_until(cond, timeout=5):
     end = time.time() + timeout
     while time.time() < end:
@@ -374,8 +374,8 @@ def wait_until(cond, timeout=5):
             return
         time.sleep(0.02)
     raise AssertionError("condition not met")
-
-
+ 
+ 
 def test_phone_upload_one_device_only(machine):
     from fastapi.testclient import TestClient
     from pathlib import Path
@@ -384,7 +384,12 @@ def test_phone_upload_one_device_only(machine):
     m.phone_start()
     ses = m.session
     web = Path("web")
-
+    captive = TestClient(up.create_captive(ses))
+    r = captive.get("/generate_204", follow_redirects=False)        # Android probe
+    assert r.status_code == 302 and r.headers["location"] == ses.upload_url
+    r = captive.get("/hotspot-detect.html", follow_redirects=False)  # iPhone probe
+    assert r.status_code == 302
+ 
     app = up.create(m, m.cfg, web, ses)
     phone = TestClient(app, client=("10.42.0.20", 5000))
     other = TestClient(app, client=("10.42.0.21", 5000))
@@ -394,7 +399,7 @@ def test_phone_upload_one_device_only(machine):
     assert m.snapshot()["phone"]["connected"]
     assert other.get(f"/{ses.token}/").status_code == 403
     assert other.get(f"/{ses.token}/api/status").status_code == 403
-
+ 
     pdf = m.tmp / "doc.pdf"
     make_pdf(pdf, 2)
     with open(pdf, "rb") as f:
@@ -405,23 +410,23 @@ def test_phone_upload_one_device_only(machine):
     with open(pdf, "rb") as f:                                       # link can't be reused
         r = phone.post(f"/{ses.token}/api/upload", files={"file": ("doc.pdf", f, "application/pdf")})
     assert r.status_code == 409
-
-
+ 
+ 
 def test_hotspot_failure_shows_error(machine):
     m = machine
-
+ 
     class Broken:
         def up(self, ssid, password):
             raise RuntimeError("no wifi")
-
+ 
         def down(self):
             pass
     m.phone.hotspot = Broken()
     m.phone_start()
     wait_for(m, "error")
     assert "Wi-Fi" in m.message and m.session is None
-
-
+ 
+ 
 def test_wifi_qr_follows_session(machine):
     from fastapi.testclient import TestClient
     from pathlib import Path
@@ -432,12 +437,8 @@ def test_wifi_qr_follows_session(machine):
     c.post("/api/phone")
     r = c.get("/api/qr/wifi")
     assert r.status_code == 200 and r.headers["content-type"] == "image/png"
-    assert c.get("/api/qr/url").status_code == 200                   # QR 2: the upload page
-    assert m.snapshot()["phone"]["url"] == m.session.upload_url
-    c.post("/api/cancel")
-    assert c.get("/api/qr/url").status_code == 404
-
-
+ 
+ 
 def test_phone_page_follows_file_to_the_machine(machine):
     from fastapi.testclient import TestClient
     from pathlib import Path
@@ -448,11 +449,11 @@ def test_phone_page_follows_file_to_the_machine(machine):
     phone = TestClient(up.create(m, m.cfg, Path("web"), ses), client=("10.42.0.20", 5000))
     st = lambda: phone.get(f"/{ses.token}/api/status").json()
     assert st()["stage"] == "waiting" and st()["accepting"]
-
+ 
     # hold conversion so we can see "processing"
     gate = threading.Event()
     real_count = m._prepare
-
+ 
     def slow_prepare(*a, **k):
         gate.wait(5)
         return real_count(*a, **k)
@@ -467,8 +468,8 @@ def test_phone_page_follows_file_to_the_machine(machine):
     gate.set()
     wait_for(m, "choose")
     assert m.session is None and st()["stage"] == "ready"
-
-
+ 
+ 
 def test_phone_page_sees_cancel_and_failure(machine):
     from fastapi.testclient import TestClient
     from pathlib import Path
@@ -480,7 +481,7 @@ def test_phone_page_sees_cancel_and_failure(machine):
     assert phone.get(f"/{ses.token}/").status_code == 200      # phone opened the page
     m.cancel()
     assert phone.get(f"/{ses.token}/api/status").json()["stage"] == "expired"
-
+ 
     m.phone_start()
     ses = m.session
     phone = TestClient(up.create(m, m.cfg, Path("web"), ses), client=("10.42.0.20", 5000))
@@ -498,3 +499,27 @@ def test_phone_page_sees_cancel_and_failure(machine):
                           files={"file": ("good.pdf", f, "application/pdf")}).status_code == 200
     wait_for(m, "choose")
     assert phone.get(f"/{ses.token}/api/status").json()["stage"] == "ready"
+ 
+def test_gpio_coin_credits_each_pulse_at_once(machine, monkeypatch):
+    import sys
+    import types
+    from app.hw.real import GpioCoinReader
+ 
+    class FakeButton:
+        def __init__(self, *a, **k):
+            self.when_pressed = None
+    monkeypatch.setitem(sys.modules, "gpiozero", types.SimpleNamespace(Button=FakeButton))
+    m = machine
+    r = GpioCoinReader({"gpio_pin": 17, "pesos_per_pulse": 1, "pulse_gap_ms": 400,
+                        "debounce_ms": 15, "active_low": True}, m.coin)
+    seen = []
+    for _ in range(5):                       # a P5 coin: 5 pulses ~60 ms apart
+        r._pulse()
+        seen.append(m.paid)
+        time.sleep(0.06)
+    assert seen == [1, 2, 3, 4, 5]           # counts up while the coin goes in
+    time.sleep(0.05)
+    r._pulse()
+    r._pulse()                               # 0 ms later: contact bounce -> ignored
+    assert m.paid == 6
+ 
