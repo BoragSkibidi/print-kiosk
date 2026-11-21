@@ -71,59 +71,8 @@ and Linux both recognise without driver picking.)
 
 Gadget script + boot service:
 ```sh
-cd ~/print-kiosk          # after step 4 (clone); or copy the two files over first
-sudo cp deploy/usb-gadget/usb-gadget.sh /usr/local/sbin/
-sudo chmod +x /usr/local/sbin/usb-gadget.sh
-sudo cp deploy/usb-gadget/usb-gadget.service /etc/systemd/system/
-sudo systemctl enable usb-gadget
-```
-
-Fixed address on the Pi side (no gateway: the link is for SSH only):
-```sh
-sudo nmcli con add type ethernet ifname usb0 con-name usb-gadget \
-  ipv4.method manual ipv4.addresses 10.55.0.1/24 ipv6.method disabled
-```
-Run it once. A second run makes a duplicate profile: remove it with `sudo nmcli con delete <uuid>`.
-
-Reboot, plug the Pi's **USB-C** port into the PC with a data cable.
-
-**Arch PC** (NetworkManager). The interface shows up as e.g. `enp0s20f0u7` (`ip -br link`, MAC `02:22:82:ff:ff:02`):
-```sh
-sudo nmcli con add type ethernet ifname enp0s20f0u7 con-name pi-usb \
-  ipv4.method manual ipv4.addresses 10.55.0.2/24 ipv4.gateway "" ipv6.method disabled
-sudo nmcli con up pi-usb
-ip -br addr show enp0s20f0u7      # must show ONLY 10.55.0.2/24
-ping -c 3 10.55.0.1               # ~0.2-1 ms. ~0.03 ms means the PC is pinging itself (see below)
-```
-Don't use `ipv4.method shared` on the PC side: it gives the PC extra addresses (`10.42.x`) that
-clash with the Pi's hotspot.
-
-**Windows PC**: the Pi appears as "Remote NDIS Compatible Device" (`Get-NetAdapter`). As Administrator:
-`New-NetIPAddress -InterfaceAlias "Ethernet 3" -IPAddress 10.55.0.2 -PrefixLength 24` (use the adapter's name).
-
-SSH key (on the PC, not the Pi; press Enter at every `ssh-keygen` question):
-```sh
-ls ~/.ssh/id_ed25519.pub || ssh-keygen -t ed25519
-ssh-copy-id kiosk@10.55.0.1
-ssh kiosk@10.55.0.1 hostname      # prints "kiosk", no password
-```
-
-### 3. Packages
-```sh
-sudo apt update && sudo apt install -y git python3-venv python3-gpiozero poppler-utils \
-  libreoffice-writer-nogui libreoffice-impress-nogui fonts-crosextra-carlito \
-  fonts-crosextra-caladea fonts-liberation cups printer-driver-cups-pdf \
-  sane-utils sane-airscan udiskie curl
-sudo usermod -aG lpadmin,scanner kiosk
-which lpstat && systemctl is-active cups       # CUPS must be there, or the kiosk shows "CUPS not responding"
-```
-`printer-driver-cups-pdf` adds a virtual printer that saves PDFs: use it until the real printer is set up
-(`lpstat -p` shows its name -> `[printer] cups_name` in `deploy/config.pi.toml`).
-
-### 4. Code
-```sh
-git clone https://github.com/BoragSkibidi/print-kiosk ~/print-kiosk && cd ~/print-kiosk
-python3 -m venv --system-site-packages .venv
+sudo apt install -y python3 python3-venv python3-pip libreoffice poppler-utils
+python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -c "import gpiozero; print('gpiozero ok')"
 ```
