@@ -179,7 +179,8 @@ class Machine:
                 "job": None if not j else {
                     **{k: j[k] for k in ("name", "pages", "mode", "price", "action", "copies")},
                     "max_copies": self._max_copies(j),
-                    "id": j["dir"].name},                  # new id per job -> fresh previews
+                    "id": j["dir"].name
+                },                  # new id per job -> fresh previews
                 "enough": price is not None and self.paid >= price,
                 "scans": len(self.scans),
                 "scan_pages": [p.stem for p in self.scans],   # changes on rescan -> new preview
@@ -192,7 +193,8 @@ class Machine:
                 "mock_coins": self.cfg["hardware"]["coin"] == "mock",
                 "phone": None if not ses else {
                     "state": ses.state, "ssid": ses.ssid, "password": ses.password,
-                    "url": ses.upload_url, "connected": ses.owner is not None},
+                    "url": ses.upload_url, "connected": ses.owner is not None
+                },
             }
 
     # ---------- coins (called by the coin reader thread, never by a phone) ----------
