@@ -1,10 +1,5 @@
-"""Phone-facing apps, one pair per phone session (see phone.py).
-
-captive: every request on the captive port (80 on the Pi) -> redirect to the upload page.
-         Phones probe a known URL right after joining Wi-Fi; getting a redirect instead
-         of the expected answer makes them open the page automatically.
-upload:  the upload page + API, only under /<token>/ and only for the first phone.
-"""
+"""Phone-facing upload page + API, one app per phone session (see phone.py).
+Served only under /<token>/ and only to the first phone that opens it."""
 import shutil
 from pathlib import Path
 
@@ -61,7 +56,10 @@ def create(machine, cfg, web: Path, session):
 
     @app.get(base + "/api/status")
     def status():
-        return {"accepting": machine.accepting_upload(session)}
+        stage = machine.phone_stage(session)
+        return {"accepting": stage == "waiting", "stage": stage,
+                "message": session.message,       # why the last file was refused, if it was
+                "max_mb": L["max_upload_mb"], "allowed": sorted(allowed)}
 
     @app.post(base + "/api/upload")
     async def upload(file: UploadFile = File(...)):

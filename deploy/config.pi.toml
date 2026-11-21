@@ -1,5 +1,3 @@
-
- 
 # Kiosk Print config for the Raspberry Pi (deployed machine).
 # Set cups_name to your printer (lpstat -p). Hotspot name/password are random per session.
  
@@ -27,7 +25,6 @@ data_dir = "./var"             # persistent: state.json (paid amount) + ledger.l
 [server]
 kiosk_port = 8001              # always bound to 127.0.0.1 (phones can't reach it)
 public_host = "10.42.0.1"      # phone servers bind to the hotspot IP only
-captive_port = 80              # captive portal: phones probe port 80 after joining Wi-Fi
 upload_port_range = [20000, 60000]   # upload page gets a random port every session
  
 [hotspot]
@@ -51,7 +48,7 @@ active_low = true        # optocoupler pulls the pin LOW on each pulse
  
 [printer]
 out_dir = "./out"                  # "file" printer writes here
-cups_name = "CUPS-PDF"             # see `lpstat -p`
+cups_name = "PDF"                  # see `lpstat -p` ("PDF" = test printer from printer-driver-cups-pdf)
 color_options = ["print-color-mode=color"]
 bw_options = ["print-color-mode=monochrome", "ColorModel=Gray"]
 extra_options = ["fit-to-page", "media=A4"]   # short bond = Letter, long bond = Legal
@@ -65,4 +62,3 @@ mode = "Color"     # "" to omit
 [usb]
 mount_roots = ["/run/media", "/media"]   # Arch: /run/media/<user>, Pi OS: /media/<user>
 fake_drive = ""
- 

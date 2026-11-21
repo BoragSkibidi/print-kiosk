@@ -1,4 +1,8 @@
 
+[hidden] {
+  display: none !important;     /* .drop etc. set display, which would beat the hidden attribute */
+}
+ 
 body {
   font-family: system-ui, sans-serif;
   max-width: 480px;
@@ -6,71 +10,228 @@ body {
   padding: 24px;
   color: #111;
 }
-  
-h1 { 
+ 
+h1 {
   font-size: 26px;
-  margin-bottom: 8px;
+  margin: 0 0 8px;
 }
-  
-p { 
+ 
+p {
   line-height: 1.4;
 }
-  
-input[type=file] { 
-  display: block; 
-  width: 100%; 
-  margin: 20px 0;
-  font-size: 16px; 
+ 
+.lead {
+  margin-top: 0;
 }
  
-button { 
-  width: 100%; 
-  font-size: 20px; 
-  font-weight: 600; 
-  padding: 14px; 
+button {
+  width: 100%;
+  font-size: 20px;
+  font-weight: 600;
+  padding: 14px;
   border-radius: 10px;
-  border: 2px solid #111; background: #111; color: #fff;
+  border: 2px solid #111;
+  background: #111;
+  color: #fff;
 }
-  
-button:disabled { 
+ 
+button:disabled {
   opacity: .4;
 }
-  
-progress { 
-  width: 100%;
-  height: 20px;
-  margin-top: 16px;
+ 
+/* ---------- dashed drop box ---------- */
+.drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 20px 0;
+  padding: 32px 16px;
+  border: 2px dashed #8a8a8a;
+  border-radius: 14px;
+  background: #fafafa;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
 }
  
-  #msg { 
-    margin-top: 16px; 
-    font-weight: 600;
-  }
-  
-  .err { 
-    color: 
-      #b00020; 
-  }
-  
-  .small {
-    font-size: 14px;
-    color: #555;
-  }
+.drop:active,
+.drop.over {                     /* finger down, or a file dragged over it */
+  border-color: #111;
+  background: #f0f0f0;
+}
  
-.box {
+.drop input {                    /* hidden but still opens the picker */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+ 
+.drop .icon {
+  width: 52px;
+  height: 52px;
+  color: #111;
+}
+ 
+.drop-title {
+  font-size: 19px;
+  font-weight: 600;
+}
+ 
+.drop-sub {
+  font-size: 14px;
+  color: #555;
+}
+ 
+.drop.disabled {
+  opacity: .4;
+  pointer-events: none;
+}
+ 
+/* ---------- chosen file card ---------- */
+.card {
+  margin: 20px 0;
+  padding: 14px;
   border: 2px solid #111;
-  border-radius: 10px;
-  padding: 14px 16px;
-  margin: 16px 0;
-  background: #fff8d6;
+  border-radius: 14px;
 }
  
-.box ol {
-  margin: 10px 0 10px 20px;
-  line-height: 1.6;
+.card.bad {
+  border-color: #b00020;
+}
+ 
+.card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+ 
+.kind {                          /* PDF / DOC / PPT badge */
+  flex: none;
+  width: 46px;
+  height: 56px;
+  border-radius: 6px;
+  background: #111;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 8px;
+  box-sizing: border-box;
+}
+ 
+.kind.pdf { background: #c62828; }
+.kind.doc { background: #1e5bb8; }
+.kind.ppt { background: #c4501b; }
+ 
+.card-info {
+  flex: 1;
+  min-width: 0;
+}
+ 
+.fname {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+ 
+button.link {
+  width: auto;
+  padding: 6px 4px;
+  font-size: 15px;
+  background: none;
+  color: #111;
+  border: none;
+  text-decoration: underline;
+}
+ 
+/* ---------- progress ---------- */
+.progress {
+  margin-top: 14px;
+}
+ 
+.track {
+  height: 10px;
+  border-radius: 5px;
+  background: #e6e6e6;
+  overflow: hidden;
+}
+ 
+.fill {
+  width: 0;
+  height: 100%;
+  border-radius: 5px;
+  background: #111;
+  transition: width .2s ease;
+}
+ 
+.fill.done {
+  background: #11782f;
+}
+ 
+.fill.busy {                     /* upload sent, machine is reading the file */
+  width: 35% !important;
+  animation: busy 1.2s ease-in-out infinite;
+}
+ 
+@keyframes busy {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+ 
+.progress-text {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 14px;
+  color: #555;
+}
+ 
+/* ---------- messages ---------- */
+#msg {
+  margin-top: 16px;
+  font-weight: 600;
+}
+ 
+#msg:empty {
+  display: none;
+}
+ 
+.err {
+  color: #b00020;
 }
  
 .ok {
   color: #11782f;
 }
  
+.small {
+  font-size: 14px;
+  color: #555;
+}
+ 
+ 
+/* ---------- finished ---------- */
+.final {
+  text-align: center;
+  padding: 40px 8px;
+}
+ 
+.final .check {
+  width: 84px;
+  height: 84px;
+}
+ 
+.final h2 {
+  margin: 18px 0 8px;
+  font-size: 24px;
+}
+ 
+.final.bad h2 {
+  color: #b00020;
+}
