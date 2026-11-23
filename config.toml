@@ -41,11 +41,11 @@ scanner = "sane"
 hotspot = "nmcli"
  
 [coin]
-gpio_pin = 27            # BCM numbering
+gpio_pin = 22            # BCM numbering
 pesos_per_pulse = 1      # acceptor programmed so P1 = 1 pulse, P5 = 5, P10 = 10
-pulse_gap_ms = 400       # silence that ends one coin (logging only; each pulse is credited at once)
+pulse_gap_ms = 400       # silence that ends one coin
 debounce_ms = 15         # ignore edges closer than this
-active_low = true        # optocoupler pulls the pin LOW on each pulse
+active_low = true # optocoupler pulls the pin LOW on each pulse
  
 [printer]
 out_dir = "./out"                  # "file" printer writes here
